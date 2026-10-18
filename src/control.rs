@@ -53,11 +53,61 @@ async fn serve_inner(scheduler: Arc<Mutex<Scheduler>>, config_path: PathBuf) -> 
     }
 }
 
+/// Identify the process on the other end of the socket.
+///
+/// `SO_PEERCRED` is not available on macOS; `LOCAL_PEERPID` answers the same
+/// question. It matters when a lighting change has to be traced back to a
+/// process: an unexpected write is otherwise unattributable.
+#[cfg(target_os = "macos")]
+fn peer_pid(stream: &UnixStream) -> Option<i32> {
+    use std::os::fd::AsRawFd;
+    let mut pid: libc::pid_t = 0;
+    let mut size = std::mem::size_of::<libc::pid_t>() as libc::socklen_t;
+    let ok = unsafe {
+        libc::getsockopt(
+            stream.as_raw_fd(),
+            libc::SOL_LOCAL,
+            libc::LOCAL_PEERPID,
+            std::ptr::addr_of_mut!(pid).cast(),
+            &mut size,
+        )
+    };
+    (ok == 0 && pid > 0).then_some(pid)
+}
+
+#[cfg(not(target_os = "macos"))]
+fn peer_pid(_stream: &UnixStream) -> Option<i32> {
+    None
+}
+
+/// Best-effort process name for a pid, via `ps`.
+fn peer_name(pid: Option<i32>) -> String {
+    let Some(pid) = pid else {
+        return "unknown".to_string();
+    };
+    let output = std::process::Command::new("ps")
+        .args(["-o", "comm=", "-p", &pid.to_string()])
+        .output();
+    match output {
+        Ok(output) if output.status.success() => {
+            let name = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if name.is_empty() {
+                format!("pid {pid}")
+            } else {
+                let base = name.rsplit('/').next().unwrap_or(&name).to_string();
+                format!("{base} (pid {pid})")
+            }
+        }
+        _ => format!("pid {pid}"),
+    }
+}
+
 async fn handle(
     stream: UnixStream,
     scheduler: &Arc<Mutex<Scheduler>>,
     config_path: &Path,
 ) -> Result<()> {
+    let client = peer_name(peer_pid(&stream));
     let mut reader = BufReader::new(stream);
     let mut line = String::new();
     // A client that connects and never speaks must not stall the channel.
@@ -67,7 +117,7 @@ async fn handle(
     )
     .await
     .context("control client timed out")??;
-    let response = dispatch(line.trim(), scheduler, config_path).await;
+    let response = dispatch(line.trim(), &client, scheduler, config_path).await;
     let mut stream = reader.into_inner();
     let text = match response {
         Ok(text) => text,
@@ -81,6 +131,7 @@ async fn handle(
 
 async fn dispatch(
     line: &str,
+    client: &str,
     scheduler: &Arc<Mutex<Scheduler>>,
     config_path: &Path,
 ) -> Result<String> {
@@ -91,9 +142,10 @@ async fn dispatch(
     // every couple of seconds and would drown everything else.
     if !matches!(command, "" | "status") {
         let arguments: Vec<&str> = parts.clone().collect();
+        let arguments = arguments.join(" ");
         crate::daemon::log(
             &scheduler.lock().await.config,
-            &format!("control: {command} {}", arguments.join(" ")),
+            &format!("control: {command} {arguments} — from {client}"),
         );
     }
     match command {
