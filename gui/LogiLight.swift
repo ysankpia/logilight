@@ -715,6 +715,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
         }
         flashSaved()
         busy = false
+        // Let the field drop its editor so the next refresh can show what the
+        // agent actually stored, not just what was typed.
+        window.makeFirstResponder(nil)
         refresh()
     }
 
@@ -737,9 +740,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
             present(text.badTimes)
             return
         }
-        // Nothing to write when the text still matches what the agent runs.
-        guard let status = sendToAgent("status"),
-              off != status["off"] as? String || on != status["on"] as? String else { return }
+        // Skip the write when the text still matches what the agent runs. If
+        // the agent cannot be reached, try anyway: that is how the "not
+        // running" message gets shown instead of a silently dropped edit.
+        if let status = sendToAgent("status"),
+           off == status["off"] as? String, on == status["on"] as? String
+        {
+            return
+        }
         autoSave("schedule \(off) \(on)")
     }
 
