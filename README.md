@@ -246,6 +246,31 @@ Quit the other one, or keep LogiLight as the only thing driving lighting.
 - Only the mouse(s) matching the filter are touched. Keyboards with HID++ RGB
   are also supported by the same write path, but were not the target here.
 
+## Releasing
+
+`main` is protected: direct pushes are rejected, and both CI jobs must pass on
+the pull request.
+
+1. Add user-visible changes to `## [Unreleased]` in `CHANGELOG.md` as you go.
+2. Before tagging, rename the section to the new version and a date, then add a
+   fresh `## [Unreleased]` above it. Also bump `version` in `Cargo.toml` and
+   `CFBundleShortVersionString` in `scripts/build-gui.sh`.
+3. Update the compare links at the bottom of `CHANGELOG.md`.
+4. Tag and release:
+
+   ```sh
+   git tag -a v0.2.0 -m "v0.2.0"
+   git push origin v0.2.0
+   gh release create v0.2.0 --title "v0.2.0" --notes-file notes.md
+   ```
+
+   The release body is the changelog section for that version, not the
+   auto-generated list: `.github/release.yml` categories only help once pull
+   requests carry the matching labels.
+
+Versions follow [SemVer](https://semver.org/): `0.x` treats any behaviour change
+as minor. There are no prebuilt binaries; each release is source-only.
+
 ## Research trail
 
 The device layer is [OpenLogi](https://github.com/AprilNEA/OpenLogi) at commit
