@@ -1,0 +1,79 @@
+name: Bug report
+description: Something does not work — lighting, schedule, install, or the window.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. This tool drives hardware, so the details below
+        are what make a fix possible.
+
+        Before filing, please check:
+        - Input Monitoring is granted for **LogiLight** (System Settings → Privacy & Security).
+        - `logilight doctor` and `logilight status` output (paste it below).
+
+  - type: input
+    id: mouse
+    attributes:
+      label: Mouse model and connection
+      description: Model name plus wired/receiver/Bluetooth, and the vendor:product id if you know it.
+      placeholder: G502 HERO, wired, 046d:c08b
+    validations:
+      required: true
+
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version and chip
+      placeholder: macOS 15.3 on Apple Silicon
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: LogiLight version
+      description: Output of `logilight --version`, or the release tag you installed.
+      placeholder: v0.1.0
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you expected, and what the lighting actually did.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Set the schedule to 22:00 / 07:00
+        2. Run `logilight off`
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs and status output
+      description: |
+        `logilight status`, `logilight doctor`, and the last lines of
+        `~/Library/Application Support/logilight/log/logilight.log`.
+      render: shell
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirmations
+      options:
+        - label: I am not reporting a security issue (those go through SECURITY.md).
+          required: true
+        - label: I removed tokens, serial numbers, and personal paths from the logs above.
+          required: true

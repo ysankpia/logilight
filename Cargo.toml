@@ -5,6 +5,10 @@ edition = "2024"
 rust-version = "1.98"
 description = "Scheduled lighting control for Logitech HID++ mice (macOS)"
 license = "MIT"
+repository = "https://github.com/ysankpia/logilight"
+readme = "README.md"
+keywords = ["logitech", "hidpp", "lighting", "macos", "launchd"]
+categories = ["command-line-utilities", "hardware-support"]
 
 [[bin]]
 name = "logilight"

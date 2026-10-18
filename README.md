@@ -1,5 +1,9 @@
 # LogiLight
 
+[![CI](https://github.com/ysankpia/logilight/actions/workflows/ci.yml/badge.svg)](https://github.com/ysankpia/logilight/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/ysankpia/logilight?sort=semver)](https://github.com/ysankpia/logilight/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A tiny macOS daemon that turns a Logitech mouse's RGB lighting **off at night and
 back on in the morning**, without Logi Options+ or G HUB.
 
@@ -273,6 +277,15 @@ LogiLight 是一个 macOS 小工具：到点自动关闭罗技鼠标的灯光，
   `~/Library/Application Support/logilight/config.toml` 里改。
 - 命令行：`logilight status`、`logilight off`、`logilight on`、
   `logilight color 3366ff`、`logilight auto`、`logilight doctor`。
+
+## Contributing
+
+- [CONTRIBUTING.md](CONTRIBUTING.md) — setup, the checks CI runs, design rules,
+  commit style.
+- [SECURITY.md](SECURITY.md) — report vulnerabilities privately, and what counts
+  as one here.
+- [CHANGELOG.md](CHANGELOG.md) — what changed in each release.
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — Contributor Covenant 2.1.
 
 ## License
 

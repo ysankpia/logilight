@@ -1,0 +1,7 @@
+# Toolchain for local development and CI.
+#
+# `channel = "stable"` keeps `rustup` and CI on the same moving target; the
+# minimum supported Rust version lives in `Cargo.toml` as `rust-version`.
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy"]

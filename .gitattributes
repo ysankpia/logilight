@@ -1,0 +1,6 @@
+# Normalise line endings; the codebase is developed on macOS and built in CI.
+* text=auto eol=lf
+
+# Binary assets: never diff or merge them as text.
+*.png binary
+*.icns binary

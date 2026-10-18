@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    name: fmt + clippy + test
+    # macOS is required, not a preference: openlogi-hid talks to IOKit.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      # These are the exact commands CONTRIBUTING.md asks contributors to run.
+      # If they disagree with the docs, fix the docs in the same PR.
+      - run: cargo fmt --all --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test --all-targets
+      - run: cargo build --release
+
+  app:
+    name: settings window typechecks
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Typecheck only: signing needs a local certificate that CI does not have.
+      - run: xcrun swiftc -typecheck gui/LogiLight.swift

@@ -1,0 +1,24 @@
+# Release notes are generated from merged pull requests by their labels.
+# Keep the label names here in sync with the labels used on issues and PRs.
+changelog:
+  exclude:
+    labels:
+      - skip-changelog
+  categories:
+    - title: Features
+      labels:
+        - enhancement
+    - title: Fixes
+      labels:
+        - bug
+    - title: Documentation
+      labels:
+        - documentation
+    - title: Maintenance
+      labels:
+        - dependencies
+        - ci
+        - chore
+    - title: Other changes
+      labels:
+        - "*"

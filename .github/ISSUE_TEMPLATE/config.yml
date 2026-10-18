@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security issue
+    url: https://github.com/ysankpia/logilight/security/advisories/new
+    about: Report vulnerabilities privately. Do not open a public issue.
+  - name: Setup and troubleshooting
+    url: https://github.com/ysankpia/logilight#troubleshooting
+    about: Input Monitoring, permissions, and "the light came back" questions are answered here.
