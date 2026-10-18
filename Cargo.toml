@@ -1,0 +1,38 @@
+[package]
+name = "logilight"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.98"
+description = "Scheduled lighting control for Logitech HID++ mice (macOS)"
+license = "MIT"
+
+[[bin]]
+name = "logilight"
+path = "src/main.rs"
+
+[dependencies]
+openlogi-hid = { git = "https://github.com/AprilNEA/OpenLogi", rev = "ad3802aa" }
+openlogi-core = { git = "https://github.com/AprilNEA/OpenLogi", rev = "ad3802aa", features = [
+  "worker",
+] }
+hidpp = { package = "openlogi-hidpp", git = "https://github.com/AprilNEA/OpenLogi", rev = "ad3802aa" }
+anyhow = "1"
+chrono = { version = "0.4", features = ["clock", "serde"] }
+clap = { version = "4", features = ["derive", "env"] }
+libc = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+tokio = { version = "1", features = [
+  "rt-multi-thread",
+  "macros",
+  "time",
+  "sync",
+  "net",
+  "io-util",
+] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
