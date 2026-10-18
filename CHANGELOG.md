@@ -6,6 +6,30 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Menu bar item with the light state, _Off / On / Schedule_, _Open LogiLight_,
+  and _Quit_. The icon dims while the lights are off and its tooltip names the
+  current state.
+- Clock pickers for the off and on times: an hour column and a minute column of
+  arrows, seeded from the config and saved on every change.
+
+### Changed
+
+- The settings app is now a background agent: `LSUIElement` plus a `.accessory`
+  activation policy, so it has no Dock tile, no ⌘-Tab entry and no row in the
+  Force Quit window. Closing the window hides it, reopening comes from the menu
+  bar or by launching the app again, and the app keeps following the schedule
+  either way.
+- Time entry no longer depends on parsing typed text: the pickers cannot hold an
+  invalid time, and a 2-second refresh no longer overwrites the value being
+  edited.
+
+### Removed
+
+- The “Times must look like 22:00 and 07:00” error path, which the pickers make
+  unreachable.
+
 ## [0.1.0] - 2026-10-18
 
 First public release. Verified end-to-end on a wired G502 HERO (`046d:c08b`).

@@ -108,7 +108,6 @@ struct Strings {
     let restartAgent: String
     let never: String
 
-    let badTimes: String
     let notRunning: String
     let actionOff: String
     let actionOn: String
@@ -135,6 +134,13 @@ struct Strings {
     /// Detail line while a manual choice overrides the schedule.
     let manualHold: String
 
+    /// Menu bar item: reopen the window.
+    let menuOpenWindow: String
+    /// Menu bar items that mirror the three lighting states.
+    let menuOff: String
+    let menuOn: String
+    let menuSchedule: String
+
     static let english = Strings(
         code: "en",
         displayName: "English",
@@ -160,7 +166,6 @@ struct Strings {
         openPrivacy: "System permissions…",
         restartAgent: "Restart agent",
         never: "never",
-        badTimes: "Times must look like 22:00 and 07:00.",
         notRunning: "The agent is not running, so %@ did nothing.",
         actionOff: "turning the lights off",
         actionOn: "restoring the lights",
@@ -177,7 +182,11 @@ struct Strings {
         autoSaved: "Saved",
         statusOnLine: "Lights are on",
         statusOffLine: "Lights are off",
-        manualHold: "set by hand — the schedule resumes at the next change"
+        manualHold: "set by hand — the schedule resumes at the next change",
+        menuOpenWindow: "Open LogiLight",
+        menuOff: "Lights off now",
+        menuOn: "Lights on now",
+        menuSchedule: "Follow schedule"
     )
 
     static let chinese = Strings(
@@ -205,7 +214,6 @@ struct Strings {
         openPrivacy: "系统权限设置…",
         restartAgent: "重启服务",
         never: "从未",
-        badTimes: "时间格式应为 22:00 和 07:00。",
         notRunning: "后台服务未运行，%1$@没有执行。",
         actionOff: "关灯",
         actionOn: "恢复灯光",
@@ -222,7 +230,11 @@ struct Strings {
         autoSaved: "已保存",
         statusOnLine: "灯光已打开",
         statusOffLine: "灯光已关闭",
-        manualHold: "手动设置中，下次定时切换时恢复自动"
+        manualHold: "手动设置中，下次定时切换时恢复自动",
+        menuOpenWindow: "打开 LogiLight",
+        menuOff: "立即关灯",
+        menuOn: "立即开灯",
+        menuSchedule: "恢复按定时执行"
     )
 
     static func resolve() -> Strings {
@@ -239,16 +251,24 @@ struct Strings {
     }
 }
 
-final class AppDelegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate, NSMenuDelegate {
     private var window: NSWindow!
+    /// Menu bar presence: the app lives here, not in the Dock.
+    private var statusItem: NSStatusItem!
+    private var statusMenu: NSMenu!
+    /// Menu bar items whose titles are rebuilt each time the menu opens.
+    private var stateItems: [NSMenuItem] = []
     private var statusLabel: NSTextField!
     private var detailLabel: NSTextField!
     private var permissionLabel: NSTextField!
     private var scheduleValue: NSTextField!
     private var capturedValue: NSTextField!
     private var actionValue: NSTextField!
-    private var offField: NSTextField!
-    private var onField: NSTextField!
+    private var offPicker: NSDatePicker!
+    private var onPicker: NSDatePicker!
+    /// The picker plus its arrow columns, as one laid-out view.
+    private var offFieldRow: NSView!
+    private var onFieldRow: NSView!
     private var modePopup: NSPopUpButton!
     private var colorWell: NSColorWell!
     private var languagePopup: NSPopUpButton!
@@ -257,23 +277,171 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
     private var refreshTimer: Timer?
     private var busy = false
     private var savedTimer: Timer?
+    /// Set while the time pickers should not be overwritten from the agent:
+    /// the user is mid-edit, or a save is still in flight.
+    private var editingTimes = false
+    /// Which picker and segment each stepper drives, keyed by identity.
+    private var steppers: [ObjectIdentifier: (NSDatePicker, Int)] = [:]
 
     private var strings: Strings {
         Strings.resolve()
     }
 
     func applicationDidFinishLaunching(_: Notification) {
+        buildStatusItem()
+        // An accessory app shows no menu bar, but the main menu still routes
+        // key equivalents, so ⌘Q and ⌘W keep working while a window is focused.
         buildMenu()
         buildWindow()
         refresh()
         refreshTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             self?.refresh()
         }
-        NSApp.activate(ignoringOtherApps: true)
+        // Launching the app is a request to see the settings, so show the window
+        // once. After that, closing it just hides it; the menu bar item stays.
+        showWindow()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_: NSApplication) -> Bool {
         false
+    }
+
+    /// Closing the window hides it. Nothing is torn down: the refresh timer
+    /// keeps the menu bar item honest while the window is closed.
+    func windowWillClose(_: Notification) {}
+
+    // MARK: - Menu bar
+
+    /// A status item with the app icon, so the app is reachable after its
+    /// window is closed. The Dock is deliberately not used: this is a small
+    /// utility that belongs in the menu bar, like the other system agents.
+    private func buildStatusItem() {
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        if let button = statusItem.button {
+            button.image = menuBarIcon()
+            button.image?.isTemplate = true
+            button.toolTip = Strings.resolve().windowTitle
+        }
+
+        statusMenu = NSMenu()
+        statusMenu.delegate = self
+
+        let open = NSMenuItem(
+            title: Strings.resolve().menuOpenWindow,
+            action: #selector(showWindow),
+            keyEquivalent: ""
+        )
+        open.target = self
+        statusMenu.addItem(open)
+        statusMenu.addItem(.separator())
+
+        let text = Strings.resolve()
+        for (title, action) in [
+            (text.menuOff, #selector(menuOff)),
+            (text.menuOn, #selector(menuOn)),
+            (text.menuSchedule, #selector(menuSchedule)),
+        ] {
+            let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+            item.target = self
+            item.state = .off
+            statusMenu.addItem(item)
+            stateItems.append(item)
+        }
+
+        statusMenu.addItem(.separator())
+        let quit = NSMenuItem(
+            title: Strings.resolve().menuQuit,
+            action: #selector(NSApplication.terminate(_:)),
+            keyEquivalent: "q"
+        )
+        statusMenu.addItem(quit)
+
+        statusItem.menu = statusMenu
+    }
+
+    /// The app icon, redrawn small enough for the menu bar and rendered as a
+    /// template so it follows the light and dark menu bar automatically.
+    private func menuBarIcon() -> NSImage {
+        let size = NSSize(width: 18, height: 18)
+        let image = NSImage(size: size)
+        image.lockFocus()
+        let ring = NSBezierPath()
+        ring.appendArc(
+            withCenter: NSPoint(x: 9, y: 8),
+            radius: 5.4,
+            startAngle: 112,
+            endAngle: 68,
+            clockwise: false
+        )
+        ring.lineWidth = 2
+        ring.lineCapStyle = .round
+        NSColor.black.setStroke()
+        ring.stroke()
+
+        let stem = NSBezierPath()
+        stem.move(to: NSPoint(x: 9, y: 8.4))
+        stem.line(to: NSPoint(x: 9, y: 15))
+        stem.lineWidth = 2
+        stem.lineCapStyle = .round
+        stem.stroke()
+        image.unlockFocus()
+        return image
+    }
+
+    /// Refresh the tick marks right before the menu is shown, so the checkmark
+    /// always matches what the agent is actually doing.
+    func menuWillOpen(_ menu: NSMenu) {
+        guard menu === statusMenu else { return }
+        let text = strings
+        for (index, item) in stateItems.enumerated() {
+            item.title = [text.menuOff, text.menuOn, text.menuSchedule][index]
+        }
+        guard let status = sendToAgent("status") else {
+            stateItems.forEach { $0.state = .off }
+            return
+        }
+        let phase = status["phase"] as? String ?? "on"
+        let manual = status["manual"] as? Bool ?? false
+        stateItems[0].state = manual && phase == "off" ? .on : .off
+        stateItems[1].state = manual && phase != "off" ? .on : .off
+        stateItems[2].state = manual ? .off : .on
+    }
+
+    /// Bring the settings window back, creating nothing new if it still exists.
+    /// `@objc` because the menu item targets it by selector.
+    @objc func showWindow() {
+        guard window != nil else {
+            buildWindow()
+            refresh()
+            return
+        }
+        // An accessory app is not active when its menu is used, so a plain
+        // orderFront would put the window behind whatever the user was doing.
+        // Raise it first, then ask for activation.
+        window.orderFrontRegardless()
+        window.makeKey()
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    /// Double-clicking the app again in Finder reopens the window instead of
+    /// starting a second copy that would fight for the same socket.
+    func applicationShouldHandleReopen(_: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        if !hasVisibleWindows {
+            showWindow()
+        }
+        return true
+    }
+
+    @objc private func menuOff() {
+        run("off", describe: strings.actionOff)
+    }
+
+    @objc private func menuOn() {
+        run("on", describe: strings.actionOn)
+    }
+
+    @objc private func menuSchedule() {
+        run("auto", describe: strings.actionScheduled)
     }
 
     private func buildMenu() {
@@ -348,7 +516,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
         )
         window.title = text.windowTitle
         window.center()
+        // Closing the window hides it. The menu bar item is the app's real
+        // home, so a closed window must not tear anything down.
         window.isReleasedWhenClosed = false
+        window.hidesOnDeactivate = false
 
         let content = NSView()
         window.contentView = content
@@ -369,16 +540,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
         capturedValue = label("—")
         actionValue = label("—")
 
-        offField = NSTextField(string: "22:00")
-        onField = NSTextField(string: "07:00")
-        for field in [offField!, onField!] {
-            field.alignment = .center
-            field.widthAnchor.constraint(equalToConstant: 84).isActive = true
-            // No Save button: commit when editing ends (Return or click-away).
-            // The delegate fires once; an action on the field would fire too
-            // and write the same settings twice.
-            field.delegate = self
-        }
+        // A clock-time picker instead of a text field: the hours and minutes
+        // segments can only hold valid values, so there is nothing to parse and
+        // nothing to reject. `hourMinute` hides the date and the AM/PM column,
+        // which keeps it a 24-hour `22:00` control like the config file.
+        offPicker = timePicker("22:00", &offFieldRow)
+        onPicker = timePicker("07:00", &onFieldRow)
 
         modePopup = NSPopUpButton()
         modePopup.addItems(withTitles: [text.modeCaptured, text.modeFixed])
@@ -443,8 +610,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
         }
         let settings = NSStackView(views: [
             row(text.rowLightState, lightStateControl),
-            row(text.rowOff, offField),
-            row(text.rowOn, onField),
+            row(text.rowOff, offFieldRow),
+            row(text.rowOn, onFieldRow),
             row(text.rowMode, modePopup),
             row(text.rowColor, colorRow),
             row(text.rowLanguage, languagePopup),
@@ -531,15 +698,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
             footer.bottomAnchor.constraint(lessThanOrEqualTo: content.bottomAnchor, constant: -18),
         ])
 
-        window.makeKeyAndOrderFront(nil)
+        // Placing the window on screen is all `buildWindow` does; whether the
+        // app then takes focus is up to the caller (see `showWindow`).
+        window.orderFront(nil)
     }
+
+    // Closing the window hides it instead of dismantling the app.
+    // Nothing to tear down here: the refresh timer keeps the menu bar item
+    // honest while the window is closed.
 
     /// Rebuild the window in the newly selected language, keeping its frame.
     private func rebuildWindow() {
         let frame = window.frame
         refreshTimer?.invalidate()
         window.close()
-        buildMenu()
+        // The language changed, so the menu bar item's menu has to follow too.
+        NSStatusBar.system.removeStatusItem(statusItem)
+        stateItems.removeAll()
+        buildStatusItem()
         buildWindow()
         window.setFrame(frame, display: true)
         refresh()
@@ -564,6 +740,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
     private func refresh() {
         guard !busy else { return }
         let text = strings
+        // The window can be hidden while the refresh timer keeps running, so
+        // only touch the window's controls when there is a window to touch.
+        guard window != nil, statusLabel != nil else { return }
         guard let status = sendToAgent("status") else {
             statusLabel.stringValue = text.agentDown
             detailLabel.stringValue = String(format: text.agentDownHint, Int(getuid()))
@@ -571,6 +750,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
             scheduleValue.stringValue = "—"
             capturedValue.stringValue = "—"
             actionValue.stringValue = "—"
+            updateStatusItem(phase: nil)
             return
         }
         let phase = status["phase"] as? String ?? "on"
@@ -580,6 +760,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
         let off = status["off"] as? String ?? "?"
         let on = status["on"] as? String ?? "?"
 
+        updateStatusItem(phase: phase)
         // The headline states the situation; the schedule lives in the stats
         // strip, so nothing here reads as a button to press.
         statusLabel.stringValue = phase == "off" ? text.statusOffLine : text.statusOnLine
@@ -611,15 +792,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
         capturedValue.stringValue = "#\(status["captured"] as? String ?? "—")"
         actionValue.stringValue = "\(actionName(status["action"] as? String ?? "")) · \(readable(status["updated"] as? String))"
 
-        if offField.currentEditor() == nil {
-            offField.stringValue = status["off"] as? String ?? offField.stringValue
-        }
-        if onField.currentEditor() == nil {
-            onField.stringValue = status["on"] as? String ?? onField.stringValue
+        // The agent is the source of truth, so the pickers follow it, except
+        // while the user is mid-edit or a save is in flight. That window is
+        // what keeps a 2-second refresh from fighting the stepper.
+        if !editingTimes, !busy {
+            offPicker.dateValue = date(fromClock: status["off"] as? String ?? "22:00")
+            onPicker.dateValue = date(fromClock: status["on"] as? String ?? "07:00")
         }
         modePopup.selectItem(at: (status["mode"] as? String) == "fixed" ? 1 : 0)
         if !colorWell.isActive {
             colorWell.color = nsColor(hex: status["color"] as? String ?? "ffffff")
+        }
+    }
+
+    /// Keep the menu bar item honest: a tooltip names the current state, and the
+    /// icon dims when the lights are off, so the menu bar alone tells the story.
+    private func updateStatusItem(phase: String?) {
+        guard let button = statusItem?.button else { return }
+        let text = strings
+        switch phase {
+        case "off":
+            button.appearsDisabled = true
+            button.toolTip = text.statusOffLine
+        case "on":
+            button.appearsDisabled = false
+            button.toolTip = text.statusOnLine
+        default:
+            button.appearsDisabled = false
+            button.toolTip = text.agentDown
         }
     }
 
@@ -652,12 +852,90 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
         return formatter.string(from: date)
     }
 
-    private func validTime(_ text: String) -> Bool {
-        let parts = text.split(separator: ":")
-        guard parts.count == 2,
-              let hour = Int(parts[0]), let minute = Int(parts[1]),
-              (0 ... 23).contains(hour), (0 ... 59).contains(minute) else { return false }
-        return parts[0].count == 2 && parts[1].count == 2
+    /// A 24-hour clock-time control: two spin segments, no date, no AM/PM.
+    ///
+    /// The stock `textFieldAndStepper` puts a single pair of arrows on the right
+    /// edge, and with two segments those arrows act on the *last* one, so the
+    /// arrow beside `22` would change the minutes. This builds one column of
+    /// arrows per segment instead: up adds an hour or a minute, down removes
+    /// one, and the order matches the text left to right.
+    private func timePicker(_ clock: String, _ rowOut: inout NSView!) -> NSDatePicker {
+        let picker = NSDatePicker()
+        picker.datePickerStyle = .textField
+        picker.datePickerElements = .hourMinute
+        picker.locale = Locale(identifier: "en_GB")
+        picker.dateValue = date(fromClock: clock)
+        picker.target = self
+        picker.action = #selector(timesChanged)
+        picker.widthAnchor.constraint(equalToConstant: 64).isActive = true
+
+        let columns = NSStackView()
+        columns.orientation = .horizontal
+        columns.spacing = 3
+        for tag in 0 ... 1 {
+            let stepper = NSStepper()
+            stepper.tag = tag
+            stepper.minValue = -1
+            stepper.maxValue = 1
+            stepper.increment = 1
+            stepper.valueWraps = false
+            stepper.autorepeat = true
+            stepper.target = self
+            stepper.action = #selector(stepperClicked(_:))
+            stepper.widthAnchor.constraint(equalToConstant: 14).isActive = true
+            columns.addArrangedSubview(stepper)
+            steppers[ObjectIdentifier(stepper)] = (picker, tag)
+        }
+
+        let row = NSStackView(views: [picker, columns])
+        row.orientation = .horizontal
+        row.spacing = 2
+        rowOut = row
+        return picker
+    }
+
+    /// Each arrow belongs to one segment: column 0 steps the hour, column 1 the
+    /// minute, and the direction of the click is the sign of the change.
+    @objc private func stepperClicked(_ stepper: NSStepper) {
+        guard !busy, let (picker, part) = steppers[ObjectIdentifier(stepper)] else { return }
+        let delta: TimeInterval = (part == 0 ? 3600 : 60) * (stepper.doubleValue < 0 ? -1 : 1)
+        picker.dateValue = picker.dateValue.addingTimeInterval(delta)
+        // Reset so the next click starts from zero again and the sign is
+        // read from the click itself.
+        stepper.doubleValue = 0
+        timesChanged()
+    }
+
+    /// `"22:00"` from the config becomes a date on a fixed reference day; only
+    /// the time of day is ever read back.
+    private func date(fromClock clock: String) -> Date {
+        var components = DateComponents(year: 2001, month: 1, day: 1)
+        let parts = clock.split(separator: ":")
+        components.hour = parts.count == 2 ? Int(parts[0]) : 22
+        components.minute = parts.count == 2 ? Int(parts[1]) : 0
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        return calendar.date(from: components) ?? Date()
+    }
+
+    /// `"22:00"`, zero padded, as the config file and the agent use it.
+    private func clock(from date: Date) -> String {
+        let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
+        return String(format: "%02d:%02d", parts.hour ?? 0, parts.minute ?? 0)
+    }
+
+    @objc private func timesChanged() {
+        guard !busy else { return }
+        // Ignore a gesture that lands on the value the agent already runs, so
+        // a click that changes nothing does not write the same schedule again.
+        let off = clock(from: offPicker.dateValue)
+        let on = clock(from: onPicker.dateValue)
+        if let status = sendToAgent("status"),
+           off == status["off"] as? String, on == status["on"] as? String
+        {
+            return
+        }
+        autoSave("schedule \(off) \(on)")
     }
 
     private func run(_ command: String, describe: String) {
@@ -703,6 +981,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
     private func autoSave(_ command: String) {
         guard !busy else { return }
         busy = true
+        // A save started from the pickers holds them still until the answer is
+        // in, so a refresh cannot rewind the value the user just chose.
+        let touchesTimes = command.hasPrefix("schedule ")
+        if touchesTimes {
+            editingTimes = true
+        }
+        defer {
+            if touchesTimes {
+                finishEditingTimes()
+            }
+        }
         guard let reply = sendToAgent(command) else {
             busy = false
             present(String(format: strings.notRunning, strings.actionSave))
@@ -715,10 +1004,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
         }
         flashSaved()
         busy = false
-        // Let the field drop its editor so the next refresh can show what the
-        // agent actually stored, not just what was typed.
-        window.makeFirstResponder(nil)
         refresh()
+    }
+
+    /// Release the pickers once a save round trip is over, after the short
+    /// pause that lets a stepper click settle. The next refresh then shows
+    /// whatever the agent actually stored.
+    private func finishEditingTimes() {
+        savedTimer?.invalidate()
+        savedTimer = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: false) { [weak self] _ in
+            guard let self else { return }
+            self.editingTimes = false
+            self.refresh()
+        }
     }
 
     private func flashSaved() {
@@ -730,36 +1028,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
         }
     }
 
-    /// Commit both times, keeping the field text when it is invalid so the
-    /// user can see and fix what they typed.
-    private func saveTimes() {
-        let text = strings
-        let off = offField.stringValue.trimmingCharacters(in: .whitespaces)
-        let on = onField.stringValue.trimmingCharacters(in: .whitespaces)
-        guard validTime(off), validTime(on) else {
-            present(text.badTimes)
-            return
-        }
-        // Skip the write when the text still matches what the agent runs. If
-        // the agent cannot be reached, try anyway: that is how the "not
-        // running" message gets shown instead of a silently dropped edit.
-        if let status = sendToAgent("status"),
-           off == status["off"] as? String, on == status["on"] as? String
-        {
-            return
-        }
-        autoSave("schedule \(off) \(on)")
-    }
-
     private func saveRestore() {
         let mode = modePopup.indexOfSelectedItem == 1 ? "fixed" : "captured"
         autoSave("restore \(mode) \(hexString(colorWell.color))")
-    }
-
-    func controlTextDidEndEditing(_ notification: Notification) {
-        guard let field = notification.object as? NSTextField,
-              field === offField || field === onField else { return }
-        saveTimes()
     }
 
     @objc private func modeChanged() {
@@ -818,5 +1089,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
 let application = NSApplication.shared
 let delegate = AppDelegate()
 application.delegate = delegate
-application.setActivationPolicy(.regular)
+// Accessory: no Dock tile, no app menu bar of its own, and no entry in Force
+// Quit. The status item is the way in. `LSUIElement` in Info.plist says the
+// same thing to the system before the process even starts.
+application.setActivationPolicy(.accessory)
 application.run()

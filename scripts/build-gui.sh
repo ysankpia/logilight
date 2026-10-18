@@ -49,6 +49,9 @@ cat >"$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleVersion</key><string>1</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
+  <!-- Menu bar app: no Dock tile, no Force Quit entry, no app menu of its own.
+       The status item is the way in. Matches setActivationPolicy(.accessory). -->
+  <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>
 </dict>
 </plist>

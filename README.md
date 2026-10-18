@@ -59,11 +59,22 @@ grant keeps working.
 ### The settings app
 
 `scripts/build-gui.sh` compiles `gui/LogiLight.swift`, draws the icon, signs the
-bundle, and installs **`/Applications/LogiLight.app`** — a normal app with a
-Dock/Launchpad icon and a window. It is a thin front end: the daemon keeps the
-HID connection (and the Input Monitoring grant), and the window talks to it over
+bundle, and installs **`/Applications/LogiLight.app`** — a menu bar app with a
+settings window. It is a thin front end: the daemon keeps the HID connection (and
+the Input Monitoring grant), and the window talks to it over
 `~/Library/Application Support/logilight/control.sock`. That is why the settings
 window never triggers a TCC prompt of its own.
+
+The app is a background agent (`LSUIElement`, activation policy `.accessory`), so
+it has no Dock tile, no ⌘-Tab entry, and no row in the Force Quit window. It
+lives in the menu bar instead:
+
+- closing the settings window hides it; the menu bar item keeps running;
+- the menu bar menu opens the window, switches the lights between
+  _Off / On / Schedule_, and quits;
+- the icon dims while the lights are off, and its tooltip names the state;
+- opening the app again from Finder brings the window back instead of starting a
+  second copy.
 
 From the window you can:
 
@@ -73,8 +84,9 @@ From the window you can:
   below. _On_ and _Off_ hold your choice by hand until the next scheduled
   change, then the schedule takes over again. Nothing is written to the config
   when you use these, so the nightly routine keeps running;
-- set the off and on times — they save as soon as you leave the field, there is
-  no Save button;
+- set the off and on times with the clock pickers — each time has an hour column
+  and a minute column of arrows, and the value saves as soon as it changes. There
+  is no Save button and no text to parse;
 - choose “restore the colour it had” or a fixed morning colour;
 - pick a colour with the colour well; it is stored and applied immediately, or
   reuse **Apply colour now** to push the current well value again;
