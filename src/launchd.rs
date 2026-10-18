@@ -13,9 +13,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{Duration, Instant};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 
-use crate::config::{data_dir, Config};
+use crate::config::{Config, data_dir};
 
 /// launchd label for the agent.
 pub const LABEL: &str = "com.luhui.logilight";

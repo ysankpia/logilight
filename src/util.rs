@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 
