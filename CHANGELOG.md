@@ -31,6 +31,8 @@ First public release. Verified end-to-end on a wired G502 HERO (`046d:c08b`).
 - Stable self-signed signing identity in the login keychain, so rebuilding keeps
   the existing Input Monitoring grant. Unchanged builds skip copying and signing.
 - `install` / `uninstall` for the per-user launchd agent and the app bundle.
+- Control log lines name the process that sent each command, so an unexpected
+  lighting change can be traced to a window click or a script.
 
 ### Notes
 
