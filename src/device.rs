@@ -6,12 +6,12 @@
 //! `0x8081`, and `0x8080`. Reading the live colour is not part of that public
 //! API, so this module opens the same channel and reads `0x8070` directly.
 
-use std::sync::Arc;
 use anyhow::{Context, Result, anyhow};
 use hidpp::device::Device;
 use hidpp::feature::color_led_effects::ColorLedEffectsFeature;
 use openlogi_core::device::{DeviceInventory, DeviceKind};
 use openlogi_hid::{DeviceRoute, dump_features};
+use std::sync::Arc;
 
 use crate::config::{Config, OFF_COLOR, RestoreMode, state_path};
 use crate::state::{AppliedDevice, State};
@@ -64,16 +64,16 @@ pub async fn lighting_devices(config: &Config, probe: bool) -> Result<Vec<FoundD
                 .clone()
                 .unwrap_or_else(|| inventory.receiver.name.clone());
             let (vendor_id, product_id) = route_ids(&route, inventory);
-            if !config
-                .devices
-                .matches(vendor_id, product_id, &name)
-            {
+            if !config.devices.matches(vendor_id, product_id, &name) {
                 continue;
             }
             if !is_lighting_target(paired.kind) {
                 continue;
             }
-            let advertised = paired.capabilities.as_ref().map_or(probe, |caps| caps.lighting);
+            let advertised = paired
+                .capabilities
+                .as_ref()
+                .map_or(probe, |caps| caps.lighting);
             if !advertised {
                 continue;
             }
@@ -143,7 +143,10 @@ async fn apply_rgb_to(devices: &[FoundDevice], color: Rgb) -> Result<Vec<Applied
         }
     }
     if applied.is_empty() && !failures.is_empty() {
-        return Err(anyhow!("no device accepted the colour: {}", failures.join("; ")));
+        return Err(anyhow!(
+            "no device accepted the colour: {}",
+            failures.join("; ")
+        ));
     }
     for failure in failures {
         eprintln!("warning: {failure}");
@@ -159,9 +162,7 @@ pub async fn apply_off(config: &Config, state: &mut State) -> Result<Vec<Applied
             // A colour that is already black means there is nothing worth
             // restoring; recording it would leave the mouse dark at dawn.
             Ok(Some(color)) if color != OFF_COLOR => {
-                state
-                    .captured
-                    .insert(device.key(), format_hex_color(color));
+                state.captured.insert(device.key(), format_hex_color(color));
             }
             Ok(Some(_)) => {}
             Ok(None) | Err(_) => {}
@@ -197,7 +198,10 @@ pub async fn apply_on_color(config: &Config, state: &mut State) -> Result<Vec<Ap
         }
     }
     if applied.is_empty() && !failures.is_empty() {
-        return Err(anyhow!("no device accepted the colour: {}", failures.join("; ")));
+        return Err(anyhow!(
+            "no device accepted the colour: {}",
+            failures.join("; ")
+        ));
     }
     for failure in failures {
         eprintln!("warning: {failure}");
@@ -305,9 +309,7 @@ pub async fn print_status(config: &Config, config_path: &std::path::Path) -> Res
         println!(
             "next change: {} (in {})",
             boundary.format("%Y-%m-%d %H:%M"),
-            crate::util::human_duration(
-                (boundary - now_local()).to_std().unwrap_or_default()
-            )
+            crate::util::human_duration((boundary - now_local()).to_std().unwrap_or_default())
         );
     }
     println!(

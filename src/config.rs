@@ -131,7 +131,8 @@ pub struct Config {
     /// What to restore when the window ends.
     pub restore: Restore,
     /// Write a line per transition to the log.
-    pub verbose: bool,}
+    pub verbose: bool,
+}
 
 impl Default for Config {
     fn default() -> Self {
@@ -159,8 +160,8 @@ impl Config {
         }
         let text =
             std::fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
-        let config: Self = toml::from_str(&text)
-            .with_context(|| format!("parse {}", path.display()))?;
+        let config: Self =
+            toml::from_str(&text).with_context(|| format!("parse {}", path.display()))?;
         config.validate()?;
         Ok(config)
     }
@@ -185,23 +186,35 @@ impl Config {
         ));
         out.push_str("[schedule]\n");
         out.push_str(&format!("enabled = {}\n", self.schedule.enabled));
-        out.push_str(&format!("# Local wall-clock times, HH:MM.\noff = \"{}\"\n", self.schedule.off));
+        out.push_str(&format!(
+            "# Local wall-clock times, HH:MM.\noff = \"{}\"\n",
+            self.schedule.off
+        ));
         out.push_str(&format!("on = \"{}\"\n", self.schedule.on));
         out.push_str(&format!("tick_seconds = {}\n", self.schedule.tick_seconds));
         out.push_str(&format!(
             "reapply_on_arrival = {}\n",
             self.schedule.reapply_on_arrival
         ));
-        out.push_str(&format!("scan_seconds = {}\n\n", self.schedule.scan_seconds));
+        out.push_str(&format!(
+            "scan_seconds = {}\n\n",
+            self.schedule.scan_seconds
+        ));
         out.push_str("[restore]\n");
         out.push_str("# \"captured\" = the colour that was live before lights-out.\n");
         out.push_str("# \"fixed\"    = always use `color` below.\n");
-        out.push_str(&format!("mode = \"{}\"\n", match self.restore.mode {
-            RestoreMode::Captured => "captured",
-            RestoreMode::Fixed => "fixed",
-        }));
+        out.push_str(&format!(
+            "mode = \"{}\"\n",
+            match self.restore.mode {
+                RestoreMode::Captured => "captured",
+                RestoreMode::Fixed => "fixed",
+            }
+        ));
         out.push_str(&format!("color = \"{}\"\n", self.restore.color));
-        out.push_str(&format!("# Used when nothing was captured.\nfallback = \"{}\"\n", self.restore.fallback));
+        out.push_str(&format!(
+            "# Used when nothing was captured.\nfallback = \"{}\"\n",
+            self.restore.fallback
+        ));
         Ok(out)
     }
 

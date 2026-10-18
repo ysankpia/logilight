@@ -37,13 +37,11 @@ pub async fn serve(scheduler: Arc<Mutex<Scheduler>>, config_path: PathBuf) {
 async fn serve_inner(scheduler: Arc<Mutex<Scheduler>>, config_path: PathBuf) -> Result<()> {
     let path = socket_path();
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .with_context(|| format!("create {}", parent.display()))?;
+        std::fs::create_dir_all(parent).with_context(|| format!("create {}", parent.display()))?;
     }
     // A stale socket from a killed daemon would make bind fail.
     let _ = std::fs::remove_file(&path);
-    let listener = UnixListener::bind(&path)
-        .with_context(|| format!("bind {}", path.display()))?;
+    let listener = UnixListener::bind(&path).with_context(|| format!("bind {}", path.display()))?;
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))
         .with_context(|| format!("restrict {}", path.display()))?;
 
@@ -73,8 +71,7 @@ async fn handle(
     let mut stream = reader.into_inner();
     let text = match response {
         Ok(text) => text,
-        Err(error) => serde_json::json!({ "ok": false, "error": format!("{error:#}") })
-            .to_string(),
+        Err(error) => serde_json::json!({ "ok": false, "error": format!("{error:#}") }).to_string(),
     };
     stream.write_all(text.as_bytes()).await?;
     stream.write_all(b"\n").await?;
@@ -249,7 +246,10 @@ fn status(scheduler: &Scheduler, config_path: &Path) -> Status {
         .iter()
         .map(|device| device.name.clone())
         .collect();
-    let device = devices.first().cloned().unwrap_or_else(|| "no device".into());
+    let device = devices
+        .first()
+        .cloned()
+        .unwrap_or_else(|| "no device".into());
     let captured = state
         .captured
         .values()

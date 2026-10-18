@@ -52,7 +52,10 @@ pub fn run(config: Config, config_path: PathBuf, args: DaemonArgs) -> Result<()>
         }
         match device::lighting_devices(&config, false).await {
             Ok(devices) if devices.is_empty() => {
-                log(&config, "no lighting-capable device found yet — will keep scanning");
+                log(
+                    &config,
+                    "no lighting-capable device found yet — will keep scanning",
+                );
             }
             Ok(devices) => log(
                 &config,
@@ -194,7 +197,15 @@ impl Scheduler {
                         describe(&applied)
                     ),
                 );
-                state.record(wanted, if arrived.is_empty() { "drift" } else { "arrival" }, &applied)?;
+                state.record(
+                    wanted,
+                    if arrived.is_empty() {
+                        "drift"
+                    } else {
+                        "arrival"
+                    },
+                    &applied,
+                )?;
                 dirty = true;
             }
             self.last_reapply_check = Some(Instant::now());

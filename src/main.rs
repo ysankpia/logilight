@@ -124,7 +124,11 @@ fn main() -> Result<()> {
                 if rgb != config::OFF_COLOR {
                     device::remember_colors(&mut state, &applied);
                 }
-                let phase = if rgb == config::OFF_COLOR { "off" } else { "on" };
+                let phase = if rgb == config::OFF_COLOR {
+                    "off"
+                } else {
+                    "on"
+                };
                 state.record(phase, "manual", &applied)?;
                 state.set_manual(phase, schedule::manual_hold(&config.schedule));
                 state.save(&config_path)?;
@@ -213,7 +217,11 @@ async fn doctor(config: &Config, config_path: &std::path::Path) -> Result<()> {
     let schedule = &config.schedule;
     println!(
         "schedule: {} (off {} → on {})",
-        if schedule.enabled { "enabled" } else { "disabled" },
+        if schedule.enabled {
+            "enabled"
+        } else {
+            "disabled"
+        },
         schedule.off,
         schedule.on
     );
