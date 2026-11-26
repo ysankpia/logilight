@@ -1,0 +1,27 @@
+#!/bin/sh
+# The repo's own pre-commit gate: the checks that are fast enough to run on
+# every commit. Slow gates (clippy, the test suite, the release build) stay in
+# CI and in `CONTRIBUTING.md`'s list; a hook that takes seconds gets bypassed
+# with `--no-verify`, which is worse than no hook.
+#
+# Enabled by either of:
+#   - a global dispatcher at `~/.git-hooks/pre-commit`, which chains to this
+#     file automatically (it looks for scripts/hooks/pre-commit);
+#   - `git config core.hooksPath scripts/hooks` in this clone.
+set -eu
+
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$staged" ] && exit 0
+
+# The token budget is a repo rule, not a machine preference: run it here so a
+# fresh clone enforces it even without the global dispatcher.
+printf '%s\n' "$staged" | "$(dirname "$0")/../check-file-tokens.sh"
+
+if printf '%s\n' "$staged" | grep -q '\.rs$'; then
+	cargo fmt --all --check
+fi
+
+if printf '%s\n' "$staged" | grep -q '^gui/.*\.swift$'; then
+	# Typecheck only: signing needs a local certificate that CI does not have.
+	xcrun swiftc -typecheck gui/Sources/*.swift
+fi

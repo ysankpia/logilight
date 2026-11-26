@@ -41,11 +41,41 @@ Run exactly these before opening a pull request — CI runs the same commands:
 cargo fmt --all --check
 cargo clippy --all-targets -- -D warnings
 cargo test --all-targets
-xcrun swiftc -typecheck gui/LogiLight.swift   # if you touched the window
+xcrun swiftc -typecheck gui/Sources/*.swift   # if you touched the window
 ```
 
 `cargo fmt` uses the edition pinned in `rustfmt.toml`. Formatting a single file
 with a bare `rustfmt file.rs` picks up the same config, so the two paths agree.
+
+## Pre-commit hook
+
+`scripts/hooks/pre-commit` runs the checks that are fast enough for every
+commit: the token budget below, `cargo fmt --check` when Rust changed, and a
+Swift typecheck when the window changed. Slow gates stay in CI.
+
+Enable it in this clone with either of:
+
+```sh
+git config core.hooksPath scripts/hooks     # this repo's hooks only
+```
+
+or, if you already have a global dispatcher at `~/.git-hooks/pre-commit`, it
+chains to `scripts/hooks/pre-commit` on its own — nothing to install.
+
+### File size budget
+
+`scripts/check-file-tokens.sh` refuses a hand-written `.rs`, `.swift` or `.sh`
+file above **5,500 tokens** (tokens ≈ bytes / 4), which is roughly 300 lines of
+dense Rust or 400 lines of AppKit. It reads a staged file list on stdin:
+
+```sh
+git diff --cached --name-only --diff-filter=ACM | scripts/check-file-tokens.sh
+```
+
+The limit lives in the script, so it is the same for everyone; `.git-hooks.conf`
+at the repo root can raise it or exempt globs, and the environment variables of
+the same names override that. There is no grandfather clause — a file that grows
+past the limit is split by responsibility, not exempted.
 
 ## Hardware changes need hardware evidence
 
