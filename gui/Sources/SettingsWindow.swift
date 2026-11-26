@@ -141,10 +141,16 @@ extension AppDelegate {
         dpiSlider.widthAnchor.constraint(equalToConstant: 208).isActive = true
         dpiValue = label("—")
         dpiValue.widthAnchor.constraint(equalToConstant: 56).isActive = true
-        let dpiRow = NSStackView(views: [dpiSlider, dpiValue])
+        // Same reason as the smoothing row: a drag cannot land on a round DPI,
+        // and the device only accepts multiples of its step.
+        dpiMinus = button("−", action: #selector(dpiStepDown))
+        dpiMinus.widthAnchor.constraint(equalToConstant: 30).isActive = true
+        dpiPlus = button("+", action: #selector(dpiStepUp))
+        dpiPlus.widthAnchor.constraint(equalToConstant: 30).isActive = true
+        let dpiRow = NSStackView(views: [dpiMinus, dpiSlider, dpiPlus, dpiValue])
         dpiRow.orientation = .horizontal
         dpiRow.alignment = .centerY
-        dpiRow.spacing = 10
+        dpiRow.spacing = 8
 
         // Smooth scrolling is off until it is switched on: it needs
         // Accessibility and it changes how every scroll in the system feels.
@@ -162,12 +168,24 @@ extension AppDelegate {
         )
         smoothSlider.isContinuous = false
         smoothSlider.widthAnchor.constraint(equalToConstant: 150).isActive = true
+        // A slider alone is hard to land on an exact number, so it is flanked
+        // by a minus and a plus that step by a fixed amount.
+        smoothMinus = button("−", action: #selector(smoothStepDown))
+        smoothMinus.widthAnchor.constraint(equalToConstant: 30).isActive = true
+        smoothPlus = button("+", action: #selector(smoothStepUp))
+        smoothPlus.widthAnchor.constraint(equalToConstant: 30).isActive = true
         smoothValue = label("300 ms")
         smoothValue.widthAnchor.constraint(equalToConstant: 56).isActive = true
-        let smoothRow = NSStackView(views: [smoothSwitch, smoothSlider, smoothValue])
+        let smoothRow = NSStackView(views: [
+            smoothSwitch,
+            smoothMinus,
+            smoothSlider,
+            smoothPlus,
+            smoothValue,
+        ])
         smoothRow.orientation = .horizontal
         smoothRow.alignment = .centerY
-        smoothRow.spacing = 10
+        smoothRow.spacing = 8
 
         let colorButton = button(text.applyNow, action: #selector(applyColor))
 

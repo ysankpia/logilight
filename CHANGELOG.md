@@ -16,6 +16,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   notch in small steps. Off by default, needs Accessibility, installs no tap
   while it is off, re-enables itself when the system disables the tap, and
   switches itself off if it cannot post.
+- `−` and `+` beside the DPI and smoothing sliders, stepping by the device's
+  DPI step (50) and by 25 ms, so both land on a round number without dragging.
+- `logilight smooth duration <ms>` sets the smoothing duration from the CLI.
 - Menu bar item with the light state, _Off / On / Schedule_, _Open LogiLight_,
   and _Quit_. The icon dims while the lights are off and its tooltip names the
   current state.

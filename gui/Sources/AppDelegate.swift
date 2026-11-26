@@ -45,8 +45,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate, N
 
     var savedLabel: NSTextField!
     var dpiSlider: NSSlider!
+    var dpiMinus: NSButton!
+    var dpiPlus: NSButton!
     var dpiValue: NSTextField!
     var smoothSwitch: NSButton!
+    var smoothMinus: NSButton!
+    var smoothPlus: NSButton!
     var smoothSlider: NSSlider!
     var smoothValue: NSTextField!
 
