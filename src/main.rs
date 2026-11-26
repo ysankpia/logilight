@@ -92,9 +92,9 @@ fn main() -> Result<()> {
                 let mut state = state::State::load(&config_path);
                 let applied = device::apply_off(&config, &mut state).await?;
                 state.record("off", "manual", &applied)?;
-                // Same rule as the settings window: the choice holds until the
-                // schedule would have changed the lights anyway.
-                state.set_manual("off", schedule::manual_hold(&config.schedule));
+                // A hand-set phase holds until it is changed by hand again:
+                // turning the lights off at noon must not undo itself at dawn.
+                state.set_manual("off", None);
                 state.save(&config_path)?;
                 println!("lighting off — {} device(s) updated", applied.len());
                 Ok(())
@@ -106,7 +106,7 @@ fn main() -> Result<()> {
                 let mut state = state::State::load(&config_path);
                 let applied = device::apply_on_color(&config, &mut state).await?;
                 state.record("on", "manual", &applied)?;
-                state.set_manual("on", schedule::manual_hold(&config.schedule));
+                state.set_manual("on", None);
                 state.save(&config_path)?;
                 println!("lighting restored — {} device(s) updated", applied.len());
                 Ok(())
@@ -130,7 +130,7 @@ fn main() -> Result<()> {
                     "on"
                 };
                 state.record(phase, "manual", &applied)?;
-                state.set_manual(phase, schedule::manual_hold(&config.schedule));
+                state.set_manual(phase, None);
                 state.save(&config_path)?;
                 println!(
                     "applied #{} — {} device(s) updated",

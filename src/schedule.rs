@@ -59,15 +59,6 @@ pub fn next_boundary(schedule: &Schedule, now: DateTime<Local>) -> Option<DateTi
     candidates.into_iter().flatten().min()
 }
 
-/// How long a manual on/off should hold before the schedule takes over.
-///
-/// The next boundary is the honest answer: the lights would have changed then
-/// anyway, so a hand-set state never silently disables the nightly routine.
-#[must_use]
-pub fn manual_hold(schedule: &Schedule) -> Option<DateTime<Local>> {
-    next_boundary(schedule, crate::util::now_local())
-}
-
 /// The next time-of-day occurrence strictly after `now`.
 fn next_occurrence(time: NaiveTime, now: DateTime<Local>) -> Option<DateTime<Local>> {
     let today = now.date_naive();

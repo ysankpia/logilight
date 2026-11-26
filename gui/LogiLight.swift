@@ -182,7 +182,7 @@ struct Strings {
         autoSaved: "Saved",
         statusOnLine: "Lights are on",
         statusOffLine: "Lights are off",
-        manualHold: "set by hand — the schedule resumes at the next change",
+        manualHold: "set by hand — choose Schedule to follow the times again",
         menuOpenWindow: "Open LogiLight",
         menuOff: "Lights off now",
         menuOn: "Lights on now",
@@ -230,7 +230,7 @@ struct Strings {
         autoSaved: "已保存",
         statusOnLine: "灯光已打开",
         statusOffLine: "灯光已关闭",
-        manualHold: "手动设置中，下次定时切换时恢复自动",
+        manualHold: "手动设置中，选「定时」才恢复自动",
         menuOpenWindow: "打开 LogiLight",
         menuOff: "立即关灯",
         menuOn: "立即开灯",
@@ -578,7 +578,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate, N
         languagePopup.action = #selector(languageChanged)
 
         // Three states, not two buttons: "Schedule" follows the times below,
-        // while On/Off hold until the next scheduled change. A segmented
+        // while On/Off hold until one of the others is chosen. A segmented
         // control shows which of those is in force instead of inviting a click.
         lightStateControl = NSSegmentedControl(
             labels: [text.stateSchedule, text.stateOn, text.stateOff],
