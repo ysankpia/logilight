@@ -58,7 +58,7 @@ grant keeps working.
 
 ### The settings app
 
-`scripts/build-gui.sh` compiles `gui/LogiLight.swift`, draws the icon, signs the
+`scripts/build-gui.sh` compiles `gui/Sources/*.swift`, draws the icon, signs the
 bundle, and installs **`/Applications/LogiLight.app`** — a menu bar app with a
 settings window. It is a thin front end: the daemon keeps the HID connection (and
 the Input Monitoring grant), and the window talks to it over

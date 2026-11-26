@@ -37,4 +37,4 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       # Typecheck only: signing needs a local certificate that CI does not have.
-      - run: xcrun swiftc -typecheck gui/LogiLight.swift
+      - run: xcrun swiftc -typecheck gui/Sources/*.swift
