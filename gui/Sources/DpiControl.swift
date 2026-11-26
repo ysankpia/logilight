@@ -29,7 +29,7 @@ extension AppDelegate {
             return
         }
         if let error = reply["error"] as? String {
-            present(error)
+            present("\(strings.actionFailed)：\(error)")
             return
         }
         let applied = reply["current"] as? Int ?? target

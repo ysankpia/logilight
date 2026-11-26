@@ -26,6 +26,7 @@ struct Strings {
     let rowDpi: String
     let rowSmooth: String
     let smoothNeedsAccessibility: String
+    let actionFailed: String
 
     let modeCaptured: String
     let modeFixed: String
@@ -89,7 +90,8 @@ struct Strings {
         rowLanguage: "Language",
         rowDpi: "DPI",
         rowSmooth: "Smooth scrolling",
-        smoothNeedsAccessibility: "Smooth scrolling needs Accessibility. Open System Settings → Privacy & Security → Accessibility, add ~/Library/Application Support/logilight/LogiLight.app, then restart the agent.",
+        smoothNeedsAccessibility: "Smooth scrolling needs Accessibility.\n\nThe settings page opens next: add\n~/Library/Application Support/logilight/LogiLight.app\nto the list, switch it on, press Restart agent here, then turn smoothing on again.",
+        actionFailed: "Action failed",
         modeCaptured: "Restore the colour it had",
         modeFixed: "Always use a fixed colour",
         languageSystem: "Follow system",
@@ -140,7 +142,8 @@ struct Strings {
         rowLanguage: "语言",
         rowDpi: "DPI",
         rowSmooth: "平滑滚动",
-        smoothNeedsAccessibility: "平滑滚动需要辅助功能权限。打开 系统设置 → 隐私与安全性 → 辅助功能，把 ~/Library/Application Support/logilight/LogiLight.app 加进去，然后点「重启服务」。",
+        smoothNeedsAccessibility: "平滑滚动需要「辅助功能」权限。\n\n点「好」之后会打开设置页：把\n~/Library/Application Support/logilight/LogiLight.app\n拖进列表（或点左下角的 + 选择它），打开开关，然后回到这里点「重启服务」，再把平滑滚动打开。",
+        actionFailed: "操作失败",
         modeCaptured: "恢复关灯前的颜色",
         modeFixed: "始终使用固定颜色",
         languageSystem: "跟随系统",
