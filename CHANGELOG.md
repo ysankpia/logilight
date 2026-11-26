@@ -16,6 +16,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- A manual _On_ or _Off_ now holds until another state is chosen, instead of
+  lapsing at the next scheduled boundary. Turning the lights off by hand keeps
+  them off through the night and the next morning until _Schedule_ (or
+  `logilight auto`) hands control back to the timetable.
+- A colour write that HID++ drops is retried up to three times, half a second
+  apart, and the log names every attempt. An idle device no longer leaves the
+  lights in the previous phase until the next 30 s tick.
+- A tick that could not reach the device is re-evaluated after 2 s instead of
+  waiting for the next scheduled tick.
+- `install` retries the `launchctl bootstrap` that follows `bootout`, which
+  launchd could reject with `Bootstrap failed: 5` while the old job was still
+  shutting down, leaving the agent stopped.
 - The settings app is now a background agent: `LSUIElement` plus a `.accessory`
   activation policy, so it has no Dock tile, no ⌘-Tab entry and no row in the
   Force Quit window. Closing the window hides it, reopening comes from the menu

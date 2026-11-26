@@ -15,7 +15,9 @@ KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
 echo "==> compiling the settings window"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-xcrun swiftc -O "$ROOT/gui/LogiLight.swift" \
+# Every file in gui/Sources is one responsibility; main.swift holds the entry
+# point, which is why the list is globbed rather than named.
+xcrun swiftc -O "$ROOT"/gui/Sources/*.swift \
 	-o "$APP/Contents/MacOS/LogiLight" \
 	-framework Cocoa
 

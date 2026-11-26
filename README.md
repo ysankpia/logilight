@@ -58,7 +58,7 @@ grant keeps working.
 
 ### The settings app
 
-`scripts/build-gui.sh` compiles `gui/LogiLight.swift`, draws the icon, signs the
+`scripts/build-gui.sh` compiles `gui/Sources/*.swift`, draws the icon, signs the
 bundle, and installs **`/Applications/LogiLight.app`** — a menu bar app with a
 settings window. It is a thin front end: the daemon keeps the HID connection (and
 the Input Monitoring grant), and the window talks to it over
@@ -81,9 +81,10 @@ From the window you can:
 - read the status card: current state, next change, schedule, night colour,
   and the last action;
 - choose **Schedule / On / Off** for the lights. _Schedule_ follows the times
-  below. _On_ and _Off_ hold your choice by hand until the next scheduled
-  change, then the schedule takes over again. Nothing is written to the config
-  when you use these, so the nightly routine keeps running;
+  below. _On_ and _Off_ hold your choice until you pick another one, so turning
+  the lights off at noon keeps them off past the evening and the next morning
+  until you choose _Schedule_ again. Nothing is written to the config when you
+  use these, so the timetable itself stays as it was;
 - set the off and on times with the clock pickers — each time has an hour column
   and a minute column of arrows, and the value saves as soon as it changes. There
   is no Save button and no text to parse;
@@ -144,9 +145,9 @@ logilight doctor              # permission + device inventory
 logilight daemon --once       # evaluate the schedule once and exit
 ```
 
-`off`, `on` and `color` take a manual hold that lasts until the next scheduled
-change, exactly like the window's switch, so a hand-triggered test never leaves
-the nightly routine disabled.
+`off`, `on` and `color` take a manual hold that lasts until another one is
+chosen, exactly like the window's switch: `logilight auto` hands control back to
+the timetable, and until then no scheduled boundary changes the lights.
 
 Run these with the installed binary if it is not on `PATH`:
 
@@ -216,11 +217,12 @@ ColorLedEffects` with volatile persistence and falls back to `0x8071`,
 ### Manual override
 
 A manual _On_ or _Off_ is stored in `state.json` as `manual` plus `manual_until`
-(the next scheduled boundary). While it holds, the daemon keeps that phase
+(`null`, meaning no deadline). While it holds, the daemon keeps that phase
 instead of the clock, which is what stops the next tick from undoing your click.
-When the boundary arrives the override is cleared and the schedule resumes, so
-choosing _Off_ at noon cannot silently cancel the 22:00 lights-out. Choosing
-_Schedule_ in the window (or `logilight auto`) clears it immediately.
+The hold lasts until you choose another state: no scheduled boundary overrides
+it, so _Off_ at noon keeps the lights off through the night and the next
+morning. Choosing _Schedule_ in the window (or `logilight auto`) clears it and
+the timetable takes over again.
 
 ## Uninstall
 

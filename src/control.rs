@@ -159,9 +159,9 @@ async fn dispatch(
             let applied = device::apply_off(&scheduler.config, &mut state).await?;
             device::remember_colors(&mut state, &applied);
             state.record("off", "manual", &applied)?;
-            // Hold the choice until the schedule would act again, so the next
-            // tick does not immediately turn the lights back on.
-            state.set_manual("off", hold_until(&scheduler.config));
+            // Hold the choice until it is changed by hand again, so neither the
+            // next tick nor the next scheduled boundary turns the lights back on.
+            state.set_manual("off", None);
             state.save(config_path)?;
             Ok(applied_json(&applied))
         }
@@ -171,7 +171,7 @@ async fn dispatch(
             let applied = device::apply_on_color(&scheduler.config, &mut state).await?;
             device::remember_colors(&mut state, &applied);
             state.record("on", "manual", &applied)?;
-            state.set_manual("on", hold_until(&scheduler.config));
+            state.set_manual("on", None);
             state.save(config_path)?;
             Ok(applied_json(&applied))
         }
@@ -182,7 +182,7 @@ async fn dispatch(
             let applied = device::apply_rgb(&scheduler.config, color).await?;
             let mut state = State::load(config_path);
             state.record("on", "manual", &applied)?;
-            state.set_manual("on", hold_until(&scheduler.config));
+            state.set_manual("on", None);
             state.save(config_path)?;
             Ok(applied_json(&applied))
         }
@@ -237,14 +237,6 @@ async fn dispatch(
         "" => bail!("empty request"),
         other => bail!("unknown request {other}"),
     }
-}
-
-/// How long a manual on/off should hold: until the schedule next changes phase.
-///
-/// Without that hand-back a manual "off" at noon would silently disable the
-/// 22:00 lights-out for good, which is the opposite of what the app promises.
-fn hold_until(config: &Config) -> Option<chrono::DateTime<chrono::Local>> {
-    crate::schedule::manual_hold(&config.schedule)
 }
 
 fn save_config(config: &Config, config_path: &Path) -> Result<()> {

@@ -12,7 +12,7 @@ hardware changes: name the mouse model and what the lighting did.
 - [ ] `cargo fmt --all --check`
 - [ ] `cargo clippy --all-targets -- -D warnings`
 - [ ] `cargo test --all-targets`
-- [ ] `xcrun swiftc -typecheck gui/LogiLight.swift` (if the window changed)
+- [ ] `xcrun swiftc -typecheck gui/Sources/*.swift` (if the window changed)
 - [ ] Checked on real hardware: <!-- mouse model, what changed on the LEDs -->
 
 ## Checklist
