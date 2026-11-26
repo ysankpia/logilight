@@ -9,14 +9,16 @@ mod config;
 mod control;
 mod daemon;
 mod device;
+mod dpi;
 mod launchd;
 mod schedule;
+mod smooth;
 mod state;
 mod util;
 
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 use clap::{Parser, Subcommand};
 
 use crate::config::Config;
@@ -46,6 +48,16 @@ enum Command {
     Color {
         /// Colour as six hex digits.
         color: String,
+    },
+    /// Read the pointer's DPI, or set it to a value the device accepts.
+    Dpi {
+        /// Target DPI; omitted means read only.
+        value: Option<u16>,
+    },
+    /// Turn smooth wheel scrolling on or off, or report its state.
+    Smooth {
+        /// `on`, `off`, or `status`.
+        state: Option<String>,
     },
     /// Hand lighting back to the schedule and apply the phase it wants now.
     Auto,
@@ -140,6 +152,30 @@ fn main() -> Result<()> {
                 Ok(())
             })
         }
+        Command::Dpi { value } => {
+            let runtime = util::runtime()?;
+            runtime.block_on(async {
+                let report = match value {
+                    Some(target) => dpi::write(&config, target).await?,
+                    None => dpi::read(&config).await?,
+                };
+                println!(
+                    "dpi: {} (range {}–{}, step {}, {} values)",
+                    report.current, report.min, report.max, report.step, report.values
+                );
+                Ok(())
+            })
+        }
+        Command::Smooth { state } => {
+            let command = match state.as_deref() {
+                Some("on") => "smooth on",
+                Some("off") => "smooth off",
+                None | Some("status") => "smooth",
+                Some(other) => bail!("smooth takes on, off, or status (got {other})"),
+            };
+            println!("{}", control::request(command)?);
+            Ok(())
+        }
         Command::Auto => {
             let runtime = util::runtime()?;
             runtime.block_on(async {
@@ -187,6 +223,14 @@ async fn doctor(config: &Config, config_path: &std::path::Path) -> Result<()> {
     println!(
         "input monitoring: {}",
         if granted { "granted" } else { "NOT granted" }
+    );
+    println!(
+        "accessibility:    {} (only smooth scrolling needs it)",
+        if smooth::has_accessibility() {
+            "granted"
+        } else {
+            "NOT granted"
+        }
     );
     if !granted {
         println!(

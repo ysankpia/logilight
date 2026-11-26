@@ -44,6 +44,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate, N
     var lightStateControl: NSSegmentedControl!
 
     var savedLabel: NSTextField!
+    var dpiSlider: NSSlider!
+    var dpiValue: NSTextField!
+    var smoothSwitch: NSButton!
+    var smoothSlider: NSSlider!
+    var smoothValue: NSTextField!
 
     var refreshTimer: Timer?
 

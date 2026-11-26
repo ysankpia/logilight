@@ -27,6 +27,25 @@ pub fn socket_path() -> PathBuf {
     crate::config::data_dir().join("control.sock")
 }
 
+/// Send one request to the running daemon and return its reply line.
+pub fn request(command: &str) -> Result<String> {
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::unix::net::UnixStream;
+
+    let path = socket_path();
+    let mut stream = UnixStream::connect(&path)
+        .with_context(|| format!("connect to the daemon at {}", path.display()))?;
+    stream
+        .write_all(command.as_bytes())
+        .and_then(|()| stream.write_all(b"\n"))
+        .with_context(|| "send the request")?;
+    let mut reply = String::new();
+    BufReader::new(stream)
+        .read_line(&mut reply)
+        .with_context(|| "read the reply")?;
+    Ok(reply.trim().to_string())
+}
+
 /// Start serving control requests. Runs until the process exits.
 pub async fn serve(scheduler: Arc<Mutex<Scheduler>>, config_path: PathBuf) {
     if let Err(error) = serve_inner(scheduler, config_path).await {
@@ -185,6 +204,97 @@ async fn dispatch(
             state.set_manual("on", None);
             state.save(config_path)?;
             Ok(applied_json(&applied))
+        }
+        // DPI lives in the device, so this reads and writes hardware rather than
+        // anything in the config file.
+        "dpi" => {
+            let config = scheduler.lock().await.config.clone();
+            let report = match parts.next() {
+                Some(value) => {
+                    let target = value.parse().context("dpi needs a number")?;
+                    crate::dpi::write(&config, target).await?
+                }
+                None => crate::dpi::read(&config).await?,
+            };
+            Ok(serde_json::json!({
+                "ok": true,
+                "current": report.current,
+                "min": report.min,
+                "max": report.max,
+                "step": report.step,
+                "values": report.values,
+            })
+            .to_string())
+        }
+        // Smooth scrolling: the tap lives in the daemon, so this both switches
+        // it and records the choice in the config file. A status query must not
+        // install the tap, so the instance is only created for `on`.
+        "smooth" => {
+            let mut scheduler = scheduler.lock().await;
+            let mut config = scheduler.config.clone();
+            let argument = parts.next();
+            let shared = match crate::smooth::instance() {
+                Some(shared) => Some(std::sync::Arc::clone(shared)),
+                None if argument == Some("on") => Some(crate::smooth::start(
+                    config.scroll.enabled,
+                    config.scroll.duration_ms,
+                )?),
+                None => None,
+            };
+            match argument {
+                None | Some("status") => {}
+                Some("on") => {
+                    if let Some(shared) = &shared {
+                        shared.set_enabled(true);
+                    }
+                    config.scroll.enabled = true;
+                }
+                Some("off") => {
+                    if let Some(shared) = &shared {
+                        shared.set_enabled(false);
+                    }
+                    config.scroll.enabled = false;
+                }
+                Some("duration") => {
+                    let milliseconds: u64 = parts
+                        .next()
+                        .context("smooth duration needs milliseconds")?
+                        .parse()
+                        .context("smooth duration needs a number")?;
+                    if let Some(shared) = &shared {
+                        shared.set_duration_ms(milliseconds);
+                        config.scroll.duration_ms = shared.duration_ms();
+                    } else {
+                        config.scroll.duration_ms = milliseconds.clamp(60, 2_000);
+                    }
+                }
+                Some(other) => bail!("smooth takes on, off, duration, or status (got {other})"),
+            }
+            if config.scroll != scheduler.config.scroll {
+                scheduler.config = config;
+                save_config(&scheduler.config, config_path)?;
+            }
+            let (enabled, duration_ms, intercepted, emitted) = match &shared {
+                Some(shared) => {
+                    let (intercepted, emitted) = shared.counters();
+                    (shared.enabled(), shared.duration_ms(), intercepted, emitted)
+                }
+                None => (
+                    scheduler.config.scroll.enabled,
+                    scheduler.config.scroll.duration_ms,
+                    0,
+                    0,
+                ),
+            };
+            Ok(serde_json::json!({
+                "ok": true,
+                "enabled": enabled,
+                "duration_ms": duration_ms,
+                "intercepted": intercepted,
+                "emitted": emitted,
+                "accessibility": crate::smooth::has_accessibility(),
+            })
+            .to_string())
         }
         // Hand control back to the schedule and settle on the scheduled phase.
         "auto" => {

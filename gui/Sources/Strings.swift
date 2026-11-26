@@ -23,6 +23,9 @@ struct Strings {
     let rowMode: String
     let rowColor: String
     let rowLanguage: String
+    let rowDpi: String
+    let rowSmooth: String
+    let smoothNeedsAccessibility: String
 
     let modeCaptured: String
     let modeFixed: String
@@ -84,6 +87,9 @@ struct Strings {
         rowMode: "Morning colour",
         rowColor: "Fixed colour",
         rowLanguage: "Language",
+        rowDpi: "DPI",
+        rowSmooth: "Smooth scrolling",
+        smoothNeedsAccessibility: "Smooth scrolling needs Accessibility — System Settings → Privacy & Security → Accessibility.",
         modeCaptured: "Restore the colour it had",
         modeFixed: "Always use a fixed colour",
         languageSystem: "Follow system",
@@ -132,6 +138,9 @@ struct Strings {
         rowMode: "早晨颜色",
         rowColor: "固定颜色",
         rowLanguage: "语言",
+        rowDpi: "DPI",
+        rowSmooth: "平滑滚动",
+        smoothNeedsAccessibility: "平滑滚动需要辅助功能权限：系统设置 → 隐私与安全性 → 辅助功能。",
         modeCaptured: "恢复关灯前的颜色",
         modeFixed: "始终使用固定颜色",
         languageSystem: "跟随系统",

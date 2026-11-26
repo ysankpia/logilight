@@ -8,6 +8,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Pointer DPI: `logilight dpi` reads the value in force plus the range the
+  device lists, `logilight dpi 1600` writes one (snapped to the nearest value
+  the device accepts, then read back), and the settings window shows a slider
+  with the same range.
+- Optional smooth wheel scrolling: one event tap in the daemon replays each
+  notch in small steps. Off by default, needs Accessibility, installs no tap
+  while it is off, re-enables itself when the system disables the tap, and
+  switches itself off if it cannot post.
 - Menu bar item with the light state, _Off / On / Schedule_, _Open LogiLight_,
   and _Quit_. The icon dims while the lights are off and its tooltip names the
   current state.
