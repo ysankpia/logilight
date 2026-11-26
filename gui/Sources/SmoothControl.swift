@@ -60,4 +60,27 @@ extension AppDelegate {
         smoothSlider.doubleValue = Double(applied)
         smoothValue.stringValue = "\(applied) ms"
     }
+
+    /// How far one click of − or + moves the duration.
+    private static let durationStep = 25.0
+
+    @objc func smoothStepDown() {
+        stepSmoothDuration(by: -Self.durationStep)
+    }
+
+    @objc func smoothStepUp() {
+        stepSmoothDuration(by: Self.durationStep)
+    }
+
+    /// Move the slider by one step and save it, so the value is always a round
+    /// number instead of whatever the pointer happened to land on.
+    private func stepSmoothDuration(by delta: Double) {
+        let next = min(
+            max(smoothSlider.doubleValue + delta, smoothSlider.minValue),
+            smoothSlider.maxValue
+        )
+        guard next != smoothSlider.doubleValue else { return }
+        smoothSlider.doubleValue = next
+        smoothDurationChanged()
+    }
 }

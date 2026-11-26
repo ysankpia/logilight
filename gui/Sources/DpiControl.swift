@@ -36,4 +36,23 @@ extension AppDelegate {
         dpiSlider.doubleValue = Double(applied)
         dpiValue.stringValue = "\(applied)"
     }
+
+    /// One click of − or + moves DPI by the device's own step.
+    @objc func dpiStepDown() {
+        stepDpi(by: -50)
+    }
+
+    @objc func dpiStepUp() {
+        stepDpi(by: 50)
+    }
+
+    private func stepDpi(by delta: Double) {
+        let next = min(
+            max(dpiSlider.doubleValue + delta, dpiSlider.minValue),
+            dpiSlider.maxValue
+        )
+        guard next != dpiSlider.doubleValue else { return }
+        dpiSlider.doubleValue = next
+        dpiChanged()
+    }
 }

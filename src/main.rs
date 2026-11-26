@@ -18,7 +18,7 @@ mod util;
 
 use std::path::PathBuf;
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand};
 
 use crate::config::Config;
@@ -56,8 +56,9 @@ enum Command {
     },
     /// Turn smooth wheel scrolling on or off, or report its state.
     Smooth {
-        /// `on`, `off`, or `status`.
-        state: Option<String>,
+        /// `on`, `off`, `status`, or `duration <ms>`.
+        #[arg(num_args = 0..)]
+        args: Vec<String>,
     },
     /// Hand lighting back to the schedule and apply the phase it wants now.
     Auto,
@@ -166,14 +167,20 @@ fn main() -> Result<()> {
                 Ok(())
             })
         }
-        Command::Smooth { state } => {
-            let command = match state.as_deref() {
-                Some("on") => "smooth on",
-                Some("off") => "smooth off",
-                None | Some("status") => "smooth",
-                Some(other) => bail!("smooth takes on, off, or status (got {other})"),
+        Command::Smooth { args } => {
+            let command = match args.first().map(String::as_str) {
+                Some("on") => "smooth on".to_string(),
+                Some("off") => "smooth off".to_string(),
+                None | Some("status") => "smooth".to_string(),
+                Some("duration") => {
+                    let value = args.get(1).context("smooth duration needs milliseconds")?;
+                    format!("smooth duration {value}")
+                }
+                Some(other) => {
+                    bail!("smooth takes on, off, status, or duration <ms> (got {other})")
+                }
             };
-            println!("{}", control::request(command)?);
+            println!("{}", control::request(&command)?);
             Ok(())
         }
         Command::Auto => {
