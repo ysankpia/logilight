@@ -15,24 +15,34 @@ extension AppDelegate {
         smoothValue.stringValue = "\(duration) ms"
     }
 
-    /// Switch smoothing on or off. On asks the agent to install the tap; if
-    /// Accessibility is missing the agent reports that instead of pretending.
+    /// Switch smoothing on or off.
+    ///
+    /// The window cannot read another process's TCC state, so it asks the agent
+    /// first. Without Accessibility the switch goes back off and the
+    /// Accessibility pane opens: the alert explains, then the settings window
+    /// lands on the page the user needs.
     @objc func smoothToggled() {
         let wanted = smoothSwitch.state == .on
+        guard let status = sendToAgent("smooth") else {
+            present(strings.notRunning)
+            smoothSwitch.state = wanted ? .off : .on
+            return
+        }
+        if wanted, status["accessibility"] as? Bool == false {
+            smoothSwitch.state = .off
+            present(strings.smoothNeedsAccessibility)
+            openAccessibility()
+            return
+        }
         guard let reply = sendToAgent(wanted ? "smooth on" : "smooth off") else {
             present(strings.notRunning)
             smoothSwitch.state = wanted ? .off : .on
             return
         }
-        if let error = reply["error"] as? String {
-            present(error)
+        if reply["error"] != nil {
             smoothSwitch.state = wanted ? .off : .on
-            return
-        }
-        if wanted, reply["accessibility"] as? Bool == false {
             present(strings.smoothNeedsAccessibility)
-            smoothSwitch.state = .off
-            _ = sendToAgent("smooth off")
+            openAccessibility()
             return
         }
         smoothValue.stringValue = "\(reply["duration_ms"] as? Int ?? 300) ms"
@@ -43,7 +53,7 @@ extension AppDelegate {
         let milliseconds = Int(smoothSlider.doubleValue.rounded())
         guard let reply = sendToAgent("smooth duration \(milliseconds)") else { return }
         if let error = reply["error"] as? String {
-            present(error)
+            present("\(strings.actionFailed)：\(error)")
             return
         }
         let applied = reply["duration_ms"] as? Int ?? milliseconds
