@@ -24,7 +24,7 @@ extension AppDelegate {
     @objc func smoothToggled() {
         let wanted = smoothSwitch.state == .on
         guard let status = sendToAgent("smooth") else {
-            present(strings.notRunning)
+            present(String(format: strings.notRunning, strings.rowSmooth))
             smoothSwitch.state = wanted ? .off : .on
             return
         }
@@ -35,7 +35,7 @@ extension AppDelegate {
             return
         }
         guard let reply = sendToAgent(wanted ? "smooth on" : "smooth off") else {
-            present(strings.notRunning)
+            present(String(format: strings.notRunning, strings.rowSmooth))
             smoothSwitch.state = wanted ? .off : .on
             return
         }
