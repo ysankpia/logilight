@@ -24,6 +24,11 @@ Tested end-to-end on a wired **G502 HERO** (`046d:c08b`), which exposes HID++
   device reconnects.
 - Re-applies the night colour if the mouse forgets it (the write is volatile
   RAM, so a power cycle or firmware replay can undo it).
+- Reads and writes the pointer's **DPI** through HID++ `0x2201`, snapping a
+  request to the nearest value the device lists and reading it back.
+- Optionally smooths **wheel scrolling**: one event tap, off by default, with
+  the duration in milliseconds. Needs Accessibility, and installs nothing when
+  it is switched off.
 - Hot-reloads nothing: edit the config and restart the agent (one command).
 
 ## Install
@@ -51,6 +56,10 @@ Building the settings app needs only the **Command Line Tools**, not Xcode
    signs it with a stable local self-signed certificate.
 3. Registers `~/Library/LaunchAgents/com.luhui.logilight.plist` and starts it.
 4. Asks for **Input Monitoring** the first time.
+
+Smooth scrolling needs one more grant, **Accessibility**, and only when it is
+switched on: the daemon installs no event tap while `[scroll] enabled = false`,
+so a tool that only changes lights and DPI never asks for it.
 
 Reinstalling an unchanged build does nothing at all (under 0.2 s, no signing).
 Rebuilding re-signs the app, but with the same certificate, so the existing
@@ -141,6 +150,11 @@ logilight off                 # turn lighting off now (captures the colour)
 logilight on                  # restore the captured colour now
 logilight color 3366ff        # apply a solid colour now
 logilight auto                # drop a manual choice, follow the schedule again
+logilight dpi                 # read the pointer's DPI and supported range
+logilight dpi 1600            # write a DPI the device accepts
+logilight smooth on           # smooth wheel scrolling (needs Accessibility)
+logilight smooth off          # hand scrolling back to the system
+logilight smooth status       # what the daemon is doing, with counters
 logilight doctor              # permission + device inventory
 logilight daemon --once       # evaluate the schedule once and exit
 ```
@@ -178,6 +192,10 @@ scan_seconds = 20
 mode = "captured"          # or "fixed"
 color = "ffffff"           # used when mode = "fixed"
 fallback = "ffffff"        # used when no colour was captured
+
+[scroll]
+enabled = false            # smooth wheel scrolling; needs Accessibility
+duration_ms = 300          # how long one notch takes to travel
 ```
 
 Then restart the agent:

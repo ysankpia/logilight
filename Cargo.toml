@@ -23,6 +23,9 @@ hidpp = { package = "openlogi-hidpp", git = "https://github.com/AprilNEA/OpenLog
 anyhow = "1"
 chrono = { version = "0.4", features = ["clock", "serde"] }
 clap = { version = "4", features = ["derive", "env"] }
+core-foundation = "0.10"
+core-foundation-sys = "0.8"
+core-graphics = { version = "0.25", features = ["highsierra"] }
 libc = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

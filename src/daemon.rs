@@ -70,6 +70,25 @@ pub fn run(config: Config, config_path: PathBuf, args: DaemonArgs) -> Result<()>
             ),
             Err(error) => log(&config, &format!("initial enumeration failed: {error:#}")),
         }
+        // The scroll tap is only installed once smoothing is asked for, so a
+        // daemon that never uses it never holds one.
+        if config.scroll.enabled {
+            match crate::smooth::start(true, config.scroll.duration_ms) {
+                Ok(shared) => log(
+                    &config,
+                    &format!(
+                        "smooth scrolling: on ({} ms){}",
+                        shared.duration_ms(),
+                        if crate::smooth::has_accessibility() {
+                            ""
+                        } else {
+                            " — Accessibility is NOT granted"
+                        }
+                    ),
+                ),
+                Err(error) => log(&config, &format!("smooth scrolling unavailable: {error:#}")),
+            }
+        }
         let control_path = config_path.clone();
         let scheduler = Scheduler::new(config, config_path);
         let shared = std::sync::Arc::new(tokio::sync::Mutex::new(scheduler));

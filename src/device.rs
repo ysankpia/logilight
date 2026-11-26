@@ -44,6 +44,8 @@ pub struct FoundDevice {
     pub route: DeviceRoute,
     /// Classification from the inventory.
     pub kind: String,
+    /// Whether the device advertises a lighting feature.
+    pub lighting: bool,
 }
 
 impl FoundDevice {
@@ -61,6 +63,24 @@ impl FoundDevice {
 /// carries measured capabilities, so probing is only needed when the inventory
 /// could not derive them (a device that answered pairing but not the probe).
 pub async fn lighting_devices(config: &Config, probe: bool) -> Result<Vec<FoundDevice>> {
+    Ok(candidates(config, probe)
+        .await?
+        .into_iter()
+        .filter(|device| device.lighting)
+        .collect())
+}
+
+/// Pointing devices: the ones a DPI setting belongs to.
+pub async fn pointing_devices(config: &Config) -> Result<Vec<FoundDevice>> {
+    Ok(candidates(config, false)
+        .await?
+        .into_iter()
+        .filter(|device| matches!(device.kind.as_str(), "mouse" | "trackball"))
+        .collect())
+}
+
+/// Every online device that passes the config filter, lighting or not.
+pub async fn candidates(config: &Config, probe: bool) -> Result<Vec<FoundDevice>> {
     let inventories = openlogi_hid::enumerate()
         .await
         .context("enumerate HID++ devices")?;
@@ -81,20 +101,18 @@ pub async fn lighting_devices(config: &Config, probe: bool) -> Result<Vec<FoundD
             if !is_lighting_target(paired.kind) {
                 continue;
             }
-            let advertised = paired
-                .capabilities
-                .as_ref()
-                .map_or(probe, |caps| caps.lighting);
-            if !advertised {
-                continue;
-            }
-            if probe && paired.capabilities.is_none() && !has_lighting_feature(&route).await {
-                continue;
-            }
+            // The inventory's measured capability wins; without one, a probe
+            // answers, and an unprobed device is given the benefit of the doubt.
+            let lighting = match paired.capabilities.as_ref() {
+                Some(caps) => caps.lighting,
+                None if probe => has_lighting_feature(&route).await,
+                None => true,
+            };
             found.push(FoundDevice {
                 name,
                 route,
                 kind: format!("{:?}", paired.kind).to_lowercase(),
+                lighting,
             });
         }
     }
