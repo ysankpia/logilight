@@ -25,7 +25,7 @@ extension AppDelegate {
     @objc func dpiChanged() {
         let target = Int(dpiSlider.doubleValue.rounded())
         guard let reply = sendToAgent("dpi \(target)") else {
-            present(strings.notRunning)
+            present(String(format: strings.notRunning, strings.rowDpi))
             return
         }
         if let error = reply["error"] as? String {
