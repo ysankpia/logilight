@@ -80,10 +80,16 @@ pub fn run(config: Config, config_path: PathBuf, args: DaemonArgs) -> Result<()>
         loop {
             let wait = {
                 let mut scheduler = shared.lock().await;
-                if let Err(error) = scheduler.tick("scheduled").await {
+                let outcome = scheduler.tick("scheduled").await;
+                let failed = outcome.is_err();
+                if let Err(error) = outcome {
                     log(&scheduler.config, &format!("tick failed: {error:#}"));
                 }
-                wait_duration(&scheduler.config)
+                if failed {
+                    RETRY_AFTER_FAILURE
+                } else {
+                    wait_duration(&scheduler.config)
+                }
             };
             tokio::time::sleep(wait).await;
         }
@@ -106,6 +112,12 @@ fn wait_duration(config: &Config) -> Duration {
     let until = until.saturating_sub(Duration::from_secs(1));
     until.min(tick).max(Duration::from_secs(1))
 }
+
+/// How long to sleep after a tick that could not reach the device.
+///
+/// The write itself already retried, so this only separates evaluations: a
+/// transition that failed must not wait a whole tick before its next attempt.
+const RETRY_AFTER_FAILURE: Duration = Duration::from_secs(2);
 
 /// Long-lived scheduler state that does not belong in the on-disk state file.
 pub(crate) struct Scheduler {
@@ -261,8 +273,7 @@ impl Scheduler {
             if !differs {
                 continue;
             }
-            let (r, g, b) = wanted.components();
-            match openlogi_hid::set_keyboard_color(&device.route, r, g, b).await {
+            match device::write_color(&device.route, wanted).await {
                 Ok(()) => applied.push(AppliedDevice {
                     name: device.name.clone(),
                     route: device.route.to_string(),

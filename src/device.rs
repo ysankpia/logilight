@@ -12,6 +12,7 @@ use hidpp::feature::color_led_effects::ColorLedEffectsFeature;
 use openlogi_core::device::{DeviceInventory, DeviceKind};
 use openlogi_hid::{DeviceRoute, dump_features};
 use std::sync::Arc;
+use std::time::Duration;
 
 use crate::config::{Config, OFF_COLOR, RestoreMode, state_path};
 use crate::state::{AppliedDevice, State};
@@ -23,6 +24,16 @@ const LIGHTING_FEATURES: [u16; 4] = [0x8070, 0x8071, 0x8081, 0x8080];
 
 /// `ColorLedEffects` feature id, read back for the live colour.
 const COLOR_LED_EFFECTS: u16 = 0x8070;
+
+/// Attempts per colour write. An idle device drops the first HID++ request
+/// after a wake, and a channel the pool replaced mid-flight fails the same
+/// way; retrying keeps the transition inside the tick that scheduled it
+/// instead of leaving the lights wrong until the next one.
+const WRITE_ATTEMPTS: u32 = 3;
+
+/// Pause between write attempts. A failed attempt already spends the HID++
+/// request timeout, so this only separates the two.
+const WRITE_RETRY_DELAY: Duration = Duration::from_millis(500);
 
 /// One controllable device found on this host.
 #[derive(Debug, Clone)]
@@ -129,11 +140,10 @@ pub async fn apply_rgb(config: &Config, color: Rgb) -> Result<Vec<AppliedDevice>
 }
 
 async fn apply_rgb_to(devices: &[FoundDevice], color: Rgb) -> Result<Vec<AppliedDevice>> {
-    let (r, g, b) = color.components();
     let mut applied = Vec::new();
     let mut failures = Vec::new();
     for device in devices {
-        match openlogi_hid::set_keyboard_color(&device.route, r, g, b).await {
+        match write_color(&device.route, color).await {
             Ok(()) => applied.push(AppliedDevice {
                 name: device.name.clone(),
                 route: device.route.to_string(),
@@ -142,6 +152,39 @@ async fn apply_rgb_to(devices: &[FoundDevice], color: Rgb) -> Result<Vec<Applied
             Err(error) => failures.push(format!("{}: {error}", device.name)),
         }
     }
+    finish_apply(applied, failures)
+}
+
+/// Report one colour write to one device, retrying a dropped request.
+pub(crate) async fn write_color(route: &DeviceRoute, color: Rgb) -> Result<()> {
+    let (r, g, b) = color.components();
+    retry_write(|| openlogi_hid::set_keyboard_color(route, r, g, b)).await
+}
+
+/// Run `attempt` until it succeeds or [`WRITE_ATTEMPTS`] are spent, keeping
+/// every failure so the log names what each attempt returned.
+async fn retry_write<T, E, F, Fut>(mut attempt: F) -> Result<T>
+where
+    E: std::fmt::Display,
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = std::result::Result<T, E>>,
+{
+    let mut failures = Vec::new();
+    for index in 1..=WRITE_ATTEMPTS {
+        match attempt().await {
+            Ok(value) => return Ok(value),
+            Err(error) => failures.push(format!("attempt {index}: {error}")),
+        }
+        if index < WRITE_ATTEMPTS {
+            tokio::time::sleep(WRITE_RETRY_DELAY).await;
+        }
+    }
+    Err(anyhow!("{}", failures.join("; ")))
+}
+
+/// Turn per-device outcomes into the result every caller expects: an error
+/// only when no device took the colour, and a warning per partial failure.
+fn finish_apply(applied: Vec<AppliedDevice>, failures: Vec<String>) -> Result<Vec<AppliedDevice>> {
     if applied.is_empty() && !failures.is_empty() {
         return Err(anyhow!(
             "no device accepted the colour: {}",
@@ -187,8 +230,7 @@ pub async fn apply_on_color(config: &Config, state: &mut State) -> Result<Vec<Ap
                 .and_then(|hex| crate::util::parse_hex_color(hex).ok())
                 .unwrap_or(fallback),
         };
-        let (r, g, b) = color.components();
-        match openlogi_hid::set_keyboard_color(&device.route, r, g, b).await {
+        match write_color(&device.route, color).await {
             Ok(()) => applied.push(AppliedDevice {
                 name: device.name.clone(),
                 route: device.route.to_string(),
@@ -197,16 +239,7 @@ pub async fn apply_on_color(config: &Config, state: &mut State) -> Result<Vec<Ap
             Err(error) => failures.push(format!("{}: {error}", device.name)),
         }
     }
-    if applied.is_empty() && !failures.is_empty() {
-        return Err(anyhow!(
-            "no device accepted the colour: {}",
-            failures.join("; ")
-        ));
-    }
-    for failure in failures {
-        eprintln!("warning: {failure}");
-    }
-    Ok(applied)
+    finish_apply(applied, failures)
 }
 
 /// Read the live colour of a device through `0x8070`.
@@ -341,4 +374,50 @@ pub async fn print_status(config: &Config, config_path: &std::path::Path) -> Res
         println!("  (none — is the mouse connected and awake?)");
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{WRITE_ATTEMPTS, retry_write};
+    use std::cell::Cell;
+
+    #[tokio::test]
+    async fn a_dropped_request_is_retried_until_it_lands() {
+        let attempts = Cell::new(0);
+        let result = retry_write(|| {
+            let attempt = attempts.get() + 1;
+            attempts.set(attempt);
+            async move {
+                if attempt < WRITE_ATTEMPTS {
+                    Err("HID++ request timed out")
+                } else {
+                    Ok("written")
+                }
+            }
+        })
+        .await;
+
+        assert_eq!(result.unwrap(), "written");
+        assert_eq!(attempts.get(), WRITE_ATTEMPTS);
+    }
+
+    #[tokio::test]
+    async fn every_failure_names_its_attempt() {
+        let attempts = Cell::new(0);
+        let result = retry_write(|| {
+            let attempt = attempts.get() + 1;
+            attempts.set(attempt);
+            async move { Err::<(), _>(format!("failure {attempt}")) }
+        })
+        .await;
+
+        let message = result.unwrap_err().to_string();
+        assert_eq!(attempts.get(), WRITE_ATTEMPTS);
+        for attempt in 1..=WRITE_ATTEMPTS {
+            assert!(
+                message.contains(&format!("attempt {attempt}: failure {attempt}")),
+                "missing attempt {attempt} in {message:?}"
+            );
+        }
+    }
 }

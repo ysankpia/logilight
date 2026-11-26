@@ -70,7 +70,7 @@ pub fn install(config: &Config, config_path: &Path) -> Result<()> {
     let granted = ensure_permission(&binary)?;
 
     bootout();
-    run_launchctl(&["bootstrap", &domain(), &path.to_string_lossy()])?;
+    bootstrap(&path)?;
     let _ = run_launchctl(&["enable", &format!("{}/{}", domain(), LABEL)]);
     // No `kickstart -k` here: bootstrap already started the job, and killing it
     // again hits launchd's ten-second respawn throttle.
@@ -520,6 +520,29 @@ fn domain() -> String {
 fn bootout() {
     let _ = run_launchctl(&["bootout", &format!("{}/{}", domain(), LABEL)]);
 }
+
+/// Load the agent, retrying while launchd finishes tearing down the previous
+/// job.
+///
+/// `bootout` returns before the job is gone, so an immediate `bootstrap` can
+/// fail with `Bootstrap failed: 5: Input/output error` — leaving the agent
+/// stopped, which is worse than a reinstall that does nothing.
+fn bootstrap(plist: &std::path::Path) -> Result<()> {
+    let mut failure = String::new();
+    for attempt in 1..=BOOTSTRAP_ATTEMPTS {
+        match run_launchctl(&["bootstrap", &domain(), &plist.to_string_lossy()]) {
+            Ok(()) => return Ok(()),
+            Err(error) => failure = format!("attempt {attempt}: {error:#}"),
+        }
+        if attempt < BOOTSTRAP_ATTEMPTS {
+            std::thread::sleep(BOOTSTRAP_RETRY_DELAY);
+        }
+    }
+    bail!("{failure}")
+}
+
+const BOOTSTRAP_ATTEMPTS: u32 = 4;
+const BOOTSTRAP_RETRY_DELAY: std::time::Duration = std::time::Duration::from_millis(500);
 
 fn run_launchctl(args: &[&str]) -> Result<()> {
     let output = Command::new("launchctl")
