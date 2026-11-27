@@ -30,7 +30,6 @@ extension AppDelegate {
             present(error)
             return
         }
-        flashSaved()
         busy = false
         refresh()
     }
@@ -45,37 +44,6 @@ extension AppDelegate {
             self.editingTimes = false
             self.refresh()
         }
-    }
-
-    func flashSaved() {
-        savedLabel.stringValue = strings.autoSaved
-        savedLabel.isHidden = false
-        savedTimer?.invalidate()
-        savedTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: false) { [weak self] _ in
-            self?.savedLabel.isHidden = true
-        }
-    }
-
-    func saveRestore() {
-        let mode = modePopup.indexOfSelectedItem == 1 ? "fixed" : "captured"
-        autoSave("restore \(mode) \(hexString(colorWell.color))")
-    }
-
-    @objc func modeChanged() {
-        saveRestore()
-    }
-
-    /// Picking a colour stores it and applies it, the way the well previously
-    /// needed a separate "apply" click.
-    @objc func colourChanged() {
-        guard !busy else { return }
-        let hex = hexString(colorWell.color)
-        autoSave("restore \(modePopup.indexOfSelectedItem == 1 ? "fixed" : "captured") \(hex)")
-        run("color \(hex)", describe: strings.actionColour)
-    }
-
-    @objc func applyColor() {
-        run("color \(hexString(colorWell.color))", describe: strings.actionColour)
     }
 
     @objc func openPrivacy() {

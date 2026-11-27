@@ -1,44 +1,46 @@
-// The settings window and the small view helpers it is built from.
+// The settings window: one status card with the night bar, four rows, footer.
 
 import Cocoa
 
 extension AppDelegate {
-    func label(_ text: String, bold: Bool = false, size: CGFloat = 13) -> NSTextField {
+    func label(
+        _ text: String,
+        size: CGFloat = 13,
+        weight: NSFont.Weight = .regular,
+        color: NSColor = Palette.text
+    ) -> NSTextField {
         let field = NSTextField(labelWithString: text)
-        field.font = bold ? NSFont.boldSystemFont(ofSize: size) : NSFont.systemFont(ofSize: size)
+        field.font = .systemFont(ofSize: size, weight: weight)
+        field.textColor = color
+        field.lineBreakMode = .byTruncatingTail
         return field
     }
 
-    func separator() -> NSView {
-        let box = NSBox()
-        box.boxType = .separator
-        return box
+    func hairline() -> NSView {
+        let view = NSView()
+        view.wantsLayer = true
+        view.layer?.backgroundColor = Palette.hairline.cgColor
+        view.heightAnchor.constraint(equalToConstant: 1).isActive = true
+        return view
     }
 
     func button(_ title: String, action: Selector) -> NSButton {
         let button = NSButton(title: title, target: self, action: action)
         button.bezelStyle = .rounded
+        button.controlSize = .regular
+        button.heightAnchor.constraint(equalToConstant: 28).isActive = true
         return button
     }
 
-    /// A small all-caps caption above a value, the way macOS summaries read.
-    func caption(_ text: String) -> NSTextField {
-        let field = label(text, bold: false, size: 10)
-        field.textColor = .tertiaryLabelColor
-        field.font = NSFont.systemFont(ofSize: 10, weight: .semibold)
-        return field
-    }
-
-    /// One “caption + value” column for the summary strip.
-    func stat(_ captionText: String, _ value: NSTextField) -> NSStackView {
-        value.font = NSFont.systemFont(ofSize: 12)
-        value.textColor = .labelColor
-        value.maximumNumberOfLines = 2
-        value.lineBreakMode = .byTruncatingTail
-        let stack = NSStackView(views: [caption(captionText), value])
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 2
+    /// One settings row: a right-aligned 96 pt label, then the control.
+    func row(_ title: String, _ control: NSView) -> NSStackView {
+        let name = label(title, color: Palette.secondary)
+        name.alignment = .right
+        name.widthAnchor.constraint(equalToConstant: 96).isActive = true
+        let stack = NSStackView(views: [name, control])
+        stack.orientation = .horizontal
+        stack.alignment = .centerY
+        stack.spacing = 12
         return stack
     }
 
@@ -47,77 +49,89 @@ extension AppDelegate {
         let stored = UserDefaults.standard.string(forKey: languageKey) ?? "auto"
 
         window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 540, height: 456),
+            contentRect: NSRect(x: 0, y: 0, width: 520, height: 480),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
         )
         window.title = text.windowTitle
-        window.center()
-        // Closing the window hides it. The menu bar item is the app's real
-        // home, so a closed window must not tear anything down.
+        window.titlebarAppearsTransparent = true
+        window.backgroundColor = Palette.titlebar
         window.isReleasedWhenClosed = false
         window.hidesOnDeactivate = false
 
         let content = NSView()
+        content.wantsLayer = true
+        content.layer?.backgroundColor = Palette.background.cgColor
         window.contentView = content
 
-        statusLabel = label(text.connecting, bold: true, size: 17)
-        detailLabel = label("")
-        detailLabel.textColor = .secondaryLabelColor
-        detailLabel.font = NSFont.systemFont(ofSize: 12)
-        detailLabel.maximumNumberOfLines = 2
-        detailLabel.lineBreakMode = .byWordWrapping
+        // ---- status card: the one moment ----
 
-        permissionLabel = label("")
-        permissionLabel.textColor = .systemOrange
-        permissionLabel.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+        let card = NSView()
+        card.wantsLayer = true
+        card.layer?.backgroundColor = Palette.card.cgColor
+        card.layer?.cornerRadius = 12
+        card.layer?.borderWidth = 1
+        card.layer?.borderColor = Palette.hairline.cgColor
+
+        statusDot = NSView()
+        statusDot.wantsLayer = true
+        statusDot.layer?.cornerRadius = 4
+        statusDot.widthAnchor.constraint(equalToConstant: 8).isActive = true
+        statusDot.heightAnchor.constraint(equalToConstant: 8).isActive = true
+
+        statusLabel = label("—", size: 15, weight: .medium)
+        let stateRow = NSStackView(views: [statusDot, statusLabel])
+        stateRow.orientation = .horizontal
+        stateRow.alignment = .centerY
+        stateRow.spacing = 8
+
+        detailLabel = label("", size: 13, color: Palette.secondary)
+        permissionLabel = label(text.noPermission, size: 12, color: Palette.accent)
         permissionLabel.isHidden = true
+        let detailStack = NSStackView(views: [detailLabel, permissionLabel])
+        detailStack.orientation = .vertical
+        detailStack.alignment = .leading
+        detailStack.spacing = 4
 
-        scheduleValue = label("—")
-        capturedValue = label("—")
-        actionValue = label("—")
+        nightBar = NightBarView()
 
-        // A clock-time picker instead of a text field: the hours and minutes
-        // segments can only hold valid values, so there is nothing to parse and
-        // nothing to reject. `hourMinute` hides the date and the AM/PM column,
-        // which keeps it a 24-hour `22:00` control like the config file.
-        offPicker = timePicker("22:00", &offFieldRow)
-        onPicker = timePicker("07:00", &onFieldRow)
+        lastLabel = label("", size: 12, color: Palette.muted)
+        nowLabel = label("", size: 12, color: Palette.muted)
+        lastLabel.font = .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
+        nowLabel.font = .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
+        let lastRow = NSStackView(views: [lastLabel, nowLabel])
+        lastRow.orientation = .horizontal
+        lastRow.distribution = .equalSpacing
+        lastRow.alignment = .centerY
 
-        modePopup = NSPopUpButton()
-        modePopup.addItems(withTitles: [text.modeCaptured, text.modeFixed])
-        modePopup.target = self
-        modePopup.action = #selector(modeChanged)
-
-        // A colour well is a tiny square by nature; give it real size so it is
-        // obvious it can be clicked.
-        colorWell = NSColorWell()
-        colorWell.color = nsColor(hex: "3366ff")
-        colorWell.widthAnchor.constraint(equalToConstant: 92).isActive = true
-        colorWell.heightAnchor.constraint(equalToConstant: 28).isActive = true
-        // Fire once when the picker settles, not on every drag step.
-        colorWell.isContinuous = false
-        colorWell.target = self
-        colorWell.action = #selector(colourChanged)
-
-        languagePopup = NSPopUpButton()
-        languagePopup.addItems(withTitles: [
-            text.languageSystem,
-            "English",
-            "简体中文",
-        ])
-        switch stored {
-        case "en": languagePopup.selectItem(at: 1)
-        case "zh-Hans": languagePopup.selectItem(at: 2)
-        default: languagePopup.selectItem(at: 0)
+        for view in [stateRow, detailStack, nightBar, lastRow] as [NSView] {
+            view.translatesAutoresizingMaskIntoConstraints = false
+            card.addSubview(view)
         }
-        languagePopup.target = self
-        languagePopup.action = #selector(languageChanged)
+        NSLayoutConstraint.activate([
+            stateRow.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 20),
+            stateRow.trailingAnchor.constraint(lessThanOrEqualTo: card.trailingAnchor, constant: -20),
+            stateRow.topAnchor.constraint(equalTo: card.topAnchor, constant: 20),
 
-        // Three states, not two buttons: "Schedule" follows the times below,
-        // while On/Off hold until one of the others is chosen. A segmented
-        // control shows which of those is in force instead of inviting a click.
+            detailStack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 36),
+            detailStack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -20),
+            detailStack.topAnchor.constraint(equalTo: stateRow.bottomAnchor, constant: 4),
+
+            nightBar.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 36),
+            nightBar.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -20),
+            nightBar.topAnchor.constraint(equalTo: detailStack.bottomAnchor, constant: 16),
+            nightBar.heightAnchor.constraint(equalToConstant: 32),
+
+            lastRow.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 36),
+            lastRow.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -20),
+            lastRow.topAnchor.constraint(equalTo: nightBar.bottomAnchor, constant: 12),
+            lastRow.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -20),
+        ])
+
+        // ---- settings ----
+
+        // Three states, one control: the same primitive the schedule uses.
         lightStateControl = NSSegmentedControl(
             labels: [text.stateSchedule, text.stateOn, text.stateOff],
             trackingMode: .selectOne,
@@ -126,113 +140,41 @@ extension AppDelegate {
         )
         lightStateControl.segmentStyle = .rounded
         lightStateControl.selectedSegment = 0
-        lightStateControl.widthAnchor.constraint(equalToConstant: 204).isActive = true
+        lightStateControl.widthAnchor.constraint(equalToConstant: 176).isActive = true
 
-        // DPI is read once when the window opens, not polled: the value lives in
-        // the mouse, and every read opens the HID device.
-        dpiSlider = NSSlider(
-            value: 1600,
-            minValue: 100,
-            maxValue: 25600,
-            target: self,
-            action: #selector(dpiChanged)
-        )
-        dpiSlider.isContinuous = false
-        dpiSlider.widthAnchor.constraint(equalToConstant: 208).isActive = true
-        dpiValue = label("—")
-        dpiValue.widthAnchor.constraint(equalToConstant: 56).isActive = true
-        // A drag cannot land on a round DPI, and the device only accepts
-        // multiples of its step.
-        dpiMinus = button("−", action: #selector(dpiStepDown))
-        dpiMinus.widthAnchor.constraint(equalToConstant: 30).isActive = true
-        dpiPlus = button("+", action: #selector(dpiStepUp))
-        dpiPlus.widthAnchor.constraint(equalToConstant: 30).isActive = true
-        let dpiRow = NSStackView(views: [dpiMinus, dpiSlider, dpiPlus, dpiValue])
-        dpiRow.orientation = .horizontal
-        dpiRow.alignment = .centerY
-        dpiRow.spacing = 8
+        offPicker = timePicker("22:00")
+        onPicker = timePicker("07:00")
 
-        let colorButton = button(text.applyNow, action: #selector(applyColor))
-
-        // Group the colour well with its action so it reads as one control.
-        let colorRow = NSStackView(views: [colorWell, colorButton])
-        colorRow.orientation = .horizontal
-        colorRow.alignment = .centerY
-        colorRow.spacing = 10
-
-        func row(_ title: String, _ control: NSView) -> NSStackView {
-            let name = label(title)
-            name.alignment = .right
-            name.widthAnchor.constraint(equalToConstant: 140).isActive = true
-            let stack = NSStackView(views: [name, control])
-            stack.orientation = .horizontal
-            stack.alignment = .centerY
-            stack.spacing = 10
-            return stack
+        languagePopup = NSPopUpButton()
+        languagePopup.addItems(withTitles: [text.languageSystem, "English", "简体中文"])
+        switch stored {
+        case "en": languagePopup.selectItem(at: 1)
+        case "zh-Hans": languagePopup.selectItem(at: 2)
+        default: languagePopup.selectItem(at: 0)
         }
+        languagePopup.target = self
+        languagePopup.action = #selector(languageChanged)
+        languagePopup.widthAnchor.constraint(equalToConstant: 120).isActive = true
+
+        let times = NSStackView(views: [
+            row(text.rowOff, offPicker),
+            row(text.rowOn, onPicker),
+        ])
+        times.orientation = .vertical
+        times.alignment = .leading
+        times.spacing = 12
+
         let settings = NSStackView(views: [
             row(text.rowLightState, lightStateControl),
-            row(text.rowDpi, dpiRow),
-            row(text.rowOff, offFieldRow),
-            row(text.rowOn, onFieldRow),
-            row(text.rowMode, modePopup),
-            row(text.rowColor, colorRow),
+            times,
             row(text.rowLanguage, languagePopup),
         ])
         settings.orientation = .vertical
         settings.alignment = .leading
-        settings.spacing = 10
+        settings.spacing = 12
+        settings.setCustomSpacing(20, after: times)
 
-        // Autosave confirmation: a quiet, transient line rather than a button.
-        savedLabel = label("")
-        savedLabel.textColor = .secondaryLabelColor
-        savedLabel.font = NSFont.systemFont(ofSize: 11)
-        savedLabel.isHidden = true
-
-        // Summary strip: three equal columns, so the header reads as a card of
-        // facts instead of a paragraph.
-        let stats = NSStackView(views: [
-            stat(text.captionSchedule, scheduleValue),
-            stat(text.captionCaptured, capturedValue),
-            stat(text.captionAction, actionValue),
-        ])
-        stats.orientation = .horizontal
-        stats.distribution = .fillEqually
-        stats.alignment = .top
-        stats.spacing = 12
-
-        // A plain layer-backed view instead of NSBox: NSBox lays out its
-        // content view with old-style autoresizing, which broke the card.
-        let card = NSView()
-        card.wantsLayer = true
-        card.layer?.backgroundColor = NSColor.textBackgroundColor.withAlphaComponent(0.5).cgColor
-        card.layer?.cornerRadius = 10
-        card.layer?.borderWidth = 1
-        card.layer?.borderColor = NSColor.separatorColor.cgColor
-
-        let cardStack = NSStackView(views: [
-            statusLabel,
-            detailLabel,
-            permissionLabel,
-            separator(),
-            stats,
-        ])
-        cardStack.orientation = .vertical
-        cardStack.alignment = .leading
-        cardStack.spacing = 7
-        cardStack.translatesAutoresizingMaskIntoConstraints = false
-        card.addSubview(cardStack)
-        NSLayoutConstraint.activate([
-            cardStack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16),
-            cardStack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16),
-            cardStack.topAnchor.constraint(equalTo: card.topAnchor, constant: 14),
-            cardStack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -14),
-        ])
-        stats.widthAnchor.constraint(equalTo: cardStack.widthAnchor).isActive = true
-        detailLabel.widthAnchor.constraint(equalTo: cardStack.widthAnchor).isActive = true
-        permissionLabel.widthAnchor.constraint(equalTo: cardStack.widthAnchor).isActive = true
-        statusLabel.widthAnchor.constraint(lessThanOrEqualTo: cardStack.widthAnchor).isActive = true
-
+        let rule = hairline()
         let footer = NSStackView(views: [
             button(text.openPrivacy, action: #selector(openPrivacy)),
             button(text.restartAgent, action: #selector(restartAgent)),
@@ -240,43 +182,40 @@ extension AppDelegate {
         footer.orientation = .horizontal
         footer.spacing = 8
 
-        for view in [card, settings, savedLabel!, footer] {
+        for view in [card, settings, rule, footer] as [NSView] {
             view.translatesAutoresizingMaskIntoConstraints = false
             content.addSubview(view)
         }
-
         NSLayoutConstraint.activate([
-            card.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
-            card.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -20),
-            card.topAnchor.constraint(equalTo: content.topAnchor, constant: 18),
+            card.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 24),
+            card.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -24),
+            card.topAnchor.constraint(equalTo: content.topAnchor, constant: 24),
 
-            settings.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 4),
-            settings.topAnchor.constraint(equalTo: card.bottomAnchor, constant: 18),
+            settings.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 24),
+            settings.topAnchor.constraint(equalTo: card.bottomAnchor, constant: 20),
 
-            savedLabel.leadingAnchor.constraint(equalTo: card.leadingAnchor),
-            savedLabel.topAnchor.constraint(equalTo: settings.bottomAnchor, constant: 10),
+            rule.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 24),
+            rule.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -24),
+            rule.topAnchor.constraint(equalTo: settings.bottomAnchor, constant: 24),
 
-            footer.leadingAnchor.constraint(equalTo: card.leadingAnchor),
-            footer.topAnchor.constraint(equalTo: savedLabel.bottomAnchor, constant: 12),
-            footer.bottomAnchor.constraint(lessThanOrEqualTo: content.bottomAnchor, constant: -18),
+            footer.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 24),
+            footer.topAnchor.constraint(equalTo: rule.bottomAnchor, constant: 16),
+            footer.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -24),
         ])
 
-        // Placing the window on screen is all `buildWindow` does; whether the
-        // app then takes focus is up to the caller (see `showWindow`).
+        let size = content.fittingSize
+        window.setContentSize(NSSize(width: 520, height: size.height))
+        window.center()
         window.orderFront(nil)
-        loadDpi()
+        // No control should open with a focus ring; nothing here is a form.
+        window.makeFirstResponder(nil)
     }
-
-    // Closing the window hides it instead of dismantling the app.
-    // Nothing to tear down here: the refresh timer keeps the menu bar item
-    // honest while the window is closed.
 
     /// Rebuild the window in the newly selected language, keeping its frame.
     func rebuildWindow() {
         let frame = window.frame
         refreshTimer?.invalidate()
         window.close()
-        // The language changed, so the menu bar item's menu has to follow too.
         NSStatusBar.system.removeStatusItem(statusItem)
         stateItems.removeAll()
         buildStatusItem()

@@ -1,60 +1,23 @@
-// The 24-hour clock control: two segments, one arrow column each.
+// The 24-hour clock control: a value field with one stepper column.
 
 import Cocoa
 
 extension AppDelegate {
-    /// A 24-hour clock-time control: two spin segments, no date, no AM/PM.
-    ///
-    /// The stock `textFieldAndStepper` puts a single pair of arrows on the right
-    /// edge, and with two segments those arrows act on the *last* one, so the
-    /// arrow beside `22` would change the minutes. This builds one column of
-    /// arrows per segment instead: up adds an hour or a minute, down removes
-    /// one, and the order matches the text left to right.
-    func timePicker(_ clock: String, _ rowOut: inout NSView!) -> NSDatePicker {
+    /// A 24-hour clock-time control: one value, one pair of arrows, no date and
+    /// no AM/PM. The stock `textFieldAndStepper` is exactly that, and it keeps
+    /// the arrows acting on the whole value instead of one segment.
+    func timePicker(_ clock: String) -> NSDatePicker {
         let picker = NSDatePicker()
-        picker.datePickerStyle = .textField
+        picker.datePickerStyle = .textFieldAndStepper
         picker.datePickerElements = .hourMinute
         picker.locale = Locale(identifier: "en_GB")
         picker.dateValue = date(fromClock: clock)
+        picker.font = .monospacedDigitSystemFont(ofSize: 13, weight: .regular)
         picker.target = self
         picker.action = #selector(timesChanged)
-        picker.widthAnchor.constraint(equalToConstant: 64).isActive = true
-
-        let columns = NSStackView()
-        columns.orientation = .horizontal
-        columns.spacing = 3
-        for tag in 0 ... 1 {
-            let stepper = NSStepper()
-            stepper.tag = tag
-            stepper.minValue = -1
-            stepper.maxValue = 1
-            stepper.increment = 1
-            stepper.valueWraps = false
-            stepper.autorepeat = true
-            stepper.target = self
-            stepper.action = #selector(stepperClicked(_:))
-            stepper.widthAnchor.constraint(equalToConstant: 14).isActive = true
-            columns.addArrangedSubview(stepper)
-            steppers[ObjectIdentifier(stepper)] = (picker, tag)
-        }
-
-        let row = NSStackView(views: [picker, columns])
-        row.orientation = .horizontal
-        row.spacing = 2
-        rowOut = row
+        picker.widthAnchor.constraint(equalToConstant: 96).isActive = true
+        picker.heightAnchor.constraint(equalToConstant: 26).isActive = true
         return picker
-    }
-
-    /// Each arrow belongs to one segment: column 0 steps the hour, column 1 the
-    /// minute, and the direction of the click is the sign of the change.
-    @objc func stepperClicked(_ stepper: NSStepper) {
-        guard !busy, let (picker, part) = steppers[ObjectIdentifier(stepper)] else { return }
-        let delta: TimeInterval = (part == 0 ? 3600 : 60) * (stepper.doubleValue < 0 ? -1 : 1)
-        picker.dateValue = picker.dateValue.addingTimeInterval(delta)
-        // Reset so the next click starts from zero again and the sign is
-        // read from the click itself.
-        stepper.doubleValue = 0
-        timesChanged()
     }
 
     /// `"22:00"` from the config becomes a date on a fixed reference day; only

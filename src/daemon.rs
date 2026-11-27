@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 use anyhow::Result;
 use clap::Args;
 
-use crate::config::{Config, OFF_COLOR, RestoreMode};
+use crate::config::{Config, OFF_COLOR};
 use crate::device::{self, FoundDevice};
 use crate::schedule::{Phase, next_boundary, phase_at};
 use crate::state::{AppliedDevice, State};
@@ -77,10 +77,15 @@ pub fn run(config: Config, config_path: PathBuf, args: DaemonArgs) -> Result<()>
         tokio::spawn(async move {
             crate::control::serve(control, control_path).await;
         });
+        let mut first = true;
         loop {
             let wait = {
                 let mut scheduler = shared.lock().await;
-                let outcome = scheduler.tick("scheduled").await;
+                // The first tick is the startup one: it applies the current
+                // phase even when the recorded state says it already did.
+                let action = if first { "startup" } else { "scheduled" };
+                first = false;
+                let outcome = scheduler.tick(action).await;
                 let failed = outcome.is_err();
                 if let Err(error) = outcome {
                     log(&scheduler.config, &format!("tick failed: {error:#}"));
@@ -177,7 +182,10 @@ impl Scheduler {
         };
         let mut dirty = expired;
 
-        if state.phase != wanted {
+        // Startup always applies once: the recorded phase can be stale after a
+        // permission change or a reinstall, and trusting it would leave the
+        // lights in the wrong state until the next boundary.
+        if state.phase != wanted || action == "startup" {
             let applied = self.apply_phase(phase, &mut state, action).await?;
             if !applied.is_empty() || action == "startup" {
                 state.record(wanted, action, &applied)?;
@@ -292,20 +300,23 @@ impl Scheduler {
 /// The colour the "on" phase should show for one device.
 fn wanted_on_color(config: &Config, state: &State, device: &FoundDevice) -> Rgb {
     let fallback = parse_hex_color(&config.restore.fallback).unwrap_or(Rgb::new(255, 255, 255));
-    match config.restore.mode {
-        RestoreMode::Fixed => parse_hex_color(&config.restore.color).unwrap_or(fallback),
-        RestoreMode::Captured => state
-            .captured
-            .get(&device.key())
-            .and_then(|hex| parse_hex_color(hex).ok())
-            .unwrap_or(fallback),
-    }
+    state
+        .captured
+        .get(&device.key())
+        .and_then(|hex| parse_hex_color(hex).ok())
+        .unwrap_or(fallback)
 }
 
 fn describe(applied: &[AppliedDevice]) -> String {
     applied
         .iter()
-        .map(|entry| format!("{} → #{}", entry.name, entry.color))
+        .map(|entry| {
+            if entry.color == device::RELEASED {
+                format!("{} → released", entry.name)
+            } else {
+                format!("{} → #{}", entry.name, entry.color)
+            }
+        })
         .collect::<Vec<_>>()
         .join(", ")
 }

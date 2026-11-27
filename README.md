@@ -7,6 +7,9 @@
 A tiny macOS daemon that turns a Logitech mouse's RGB lighting **off at night and
 back on in the morning**, without Logi Options+ or G HUB.
 
+Device configuration — DPI, effects, buttons — belongs to Logitech G HUB. This
+tool owns only what G HUB cannot do: the clock.
+
 Default schedule: **off at 22:00, restore at 07:00**, every day.
 
 Built on the same HID++ device layer as [OpenLogi](https://github.com/AprilNEA/OpenLogi)
@@ -22,14 +25,10 @@ Tested end-to-end on a wired **G502 HERO** (`046d:c08b`), which exposes HID++
   exact colour in the morning (`restore.mode = "captured"`). A device that
   cannot report its colour — the G102 has no `0x8070` read-back — is left
   alone, so its own lighting effect survives instead of being painted over.
-- `logilight release` hands LED control back to the device's firmware, which is
-  what a device does for itself after a colour write claimed it.
 - Runs as a per-user `launchd` agent, starts at login, survives sleep/wake and
   device reconnects.
 - Re-applies the night colour if the mouse forgets it (the write is volatile
   RAM, so a power cycle or firmware replay can undo it).
-- Reads and writes the pointer's **DPI** through HID++ `0x2201`, snapping a
-  request to the nearest value the device lists and reading it back.
 - Hot-reloads nothing: edit the config and restart the agent (one command).
 
 ## Install
@@ -147,13 +146,6 @@ tccutil reset ListenEvent com.luhui.logilight
 
 ```sh
 logilight status              # schedule, phase, next change, devices, live colour
-logilight off                 # turn lighting off now (captures the colour)
-logilight on                  # restore the captured colour now
-logilight color 3366ff        # apply a solid colour now
-logilight auto                # drop a manual choice, follow the schedule again
-logilight dpi                 # read the pointer's DPI and supported range
-logilight dpi 1600            # write a DPI the device accepts
-logilight release             # give the lights back to the device's own effect
 logilight doctor              # permission + device inventory
 logilight daemon --once       # evaluate the schedule once and exit
 ```
@@ -188,9 +180,7 @@ reapply_on_arrival = true
 scan_seconds = 20
 
 [restore]
-mode = "captured"          # or "fixed"
-color = "ffffff"           # used when mode = "fixed"
-fallback = "ffffff"        # used when no colour was captured
+fallback = "ffffff"        # dawn colour, only for a device that cannot take its LEDs back
 
 ```
 

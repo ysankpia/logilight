@@ -14,23 +14,14 @@ struct Strings {
     let scheduleLine: String
     let nextChange: String
     let noPermission: String
-    let captionSchedule: String
-    let captionCaptured: String
-    let captionAction: String
 
     let rowOff: String
     let rowOn: String
-    let rowMode: String
-    let rowColor: String
     let rowLanguage: String
-    let rowDpi: String
     let actionFailed: String
 
-    let modeCaptured: String
-    let modeFixed: String
     let languageSystem: String
 
-    let applyNow: String
     let openPrivacy: String
     let restartAgent: String
     let never: String
@@ -58,6 +49,9 @@ struct Strings {
     /// Headline: what the lights are doing right now.
     let statusOnLine: String
     let statusOffLine: String
+    let statusNoDevice: String
+    let nowPrefix: String
+    let lastAction: String
     /// Detail line while a manual choice overrides the schedule.
     let manualHold: String
 
@@ -78,20 +72,11 @@ struct Strings {
         scheduleLine: "Schedule: off %@ → on %@",
         nextChange: "Next change: %@",
         noPermission: "Input Monitoring is NOT granted — the agent cannot reach the mouse.",
-        captionSchedule: "SCHEDULE",
-        captionCaptured: "NIGHT COLOUR",
-        captionAction: "LAST ACTION",
         rowOff: "Lights off at",
         rowOn: "Lights on at",
-        rowMode: "Morning colour",
-        rowColor: "Fixed colour",
         rowLanguage: "Language",
-        rowDpi: "DPI",
         actionFailed: "Action failed",
-        modeCaptured: "Restore the colour it had",
-        modeFixed: "Always use a fixed colour",
         languageSystem: "Follow system",
-        applyNow: "Apply colour now",
         openPrivacy: "System permissions…",
         restartAgent: "Restart agent",
         never: "never",
@@ -111,6 +96,9 @@ struct Strings {
         autoSaved: "Saved",
         statusOnLine: "Lights are on",
         statusOffLine: "Lights are off",
+        statusNoDevice: "No mouse found",
+        nowPrefix: "Now",
+        lastAction: "Last · %1$@ · %2$@",
         manualHold: "set by hand — choose Schedule to follow the times again",
         menuOpenWindow: "Open LogiLight",
         menuOff: "Lights off now",
@@ -128,20 +116,11 @@ struct Strings {
         scheduleLine: "定时：%1$@ 关灯 → %2$@ 开灯",
         nextChange: "下次切换：%@",
         noPermission: "尚未授予“输入监控”权限，后台服务无法访问鼠标。",
-        captionSchedule: "定时",
-        captionCaptured: "夜间颜色",
-        captionAction: "上次操作",
         rowOff: "关灯时间",
         rowOn: "开灯时间",
-        rowMode: "早晨颜色",
-        rowColor: "固定颜色",
         rowLanguage: "语言",
-        rowDpi: "DPI",
         actionFailed: "操作失败",
-        modeCaptured: "恢复关灯前的颜色",
-        modeFixed: "始终使用固定颜色",
         languageSystem: "跟随系统",
-        applyNow: "应用当前颜色",
         openPrivacy: "系统权限设置…",
         restartAgent: "重启服务",
         never: "从未",
@@ -161,6 +140,9 @@ struct Strings {
         autoSaved: "已保存",
         statusOnLine: "灯光已打开",
         statusOffLine: "灯光已关闭",
+        statusNoDevice: "未找到鼠标",
+        nowPrefix: "现在",
+        lastAction: "上次操作 · %1$@ · %2$@",
         manualHold: "手动设置中，选「定时」才恢复自动",
         menuOpenWindow: "打开 LogiLight",
         menuOff: "立即关灯",

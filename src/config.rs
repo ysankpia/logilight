@@ -90,34 +90,17 @@ impl Default for Schedule {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Restore {
-    /// `captured` restores whatever colour was on the mouse before the last
-    /// "off"; `fixed` always uses [`Self::color`].
-    pub mode: RestoreMode,
-    /// Colour used by [`RestoreMode::Fixed`], six hex digits.
-    pub color: String,
-    /// Colour to restore when nothing was captured (for example the first run
-    /// happened during the night window).
+    /// Colour written at dawn, only for a device that cannot take its LEDs
+    /// back from the firmware. Six hex digits.
     pub fallback: String,
 }
 
 impl Default for Restore {
     fn default() -> Self {
         Self {
-            mode: RestoreMode::Captured,
-            color: "ffffff".to_string(),
             fallback: "ffffff".to_string(),
         }
     }
-}
-
-/// How the "on" time decides which colour to write.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum RestoreMode {
-    /// Restore the colour that was live before lighting was turned off.
-    Captured,
-    /// Always restore [`Restore::color`].
-    Fixed,
 }
 
 /// Everything the daemon reads from disk.
@@ -201,18 +184,8 @@ impl Config {
             self.schedule.scan_seconds
         ));
         out.push_str("[restore]\n");
-        out.push_str("# \"captured\" = the colour that was live before lights-out.\n");
-        out.push_str("# \"fixed\"    = always use `color` below.\n");
         out.push_str(&format!(
-            "mode = \"{}\"\n",
-            match self.restore.mode {
-                RestoreMode::Captured => "captured",
-                RestoreMode::Fixed => "fixed",
-            }
-        ));
-        out.push_str(&format!("color = \"{}\"\n", self.restore.color));
-        out.push_str(&format!(
-            "# Used when nothing was captured.\nfallback = \"{}\"\n",
+            "# Dawn colour, used only when a device cannot take its LEDs back.\nfallback = \"{}\"\n",
             self.restore.fallback
         ));
         Ok(out)
@@ -224,8 +197,6 @@ impl Config {
             .with_context(|| "schedule.off must be HH:MM")?;
         crate::schedule::parse_clock(&self.schedule.on)
             .with_context(|| "schedule.on must be HH:MM")?;
-        crate::util::parse_hex_color(&self.restore.color)
-            .with_context(|| "restore.color must be six hex digits")?;
         crate::util::parse_hex_color(&self.restore.fallback)
             .with_context(|| "restore.fallback must be six hex digits")?;
         if self.schedule.tick_seconds == 0 {

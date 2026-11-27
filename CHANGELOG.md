@@ -8,15 +8,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Pointer DPI: `logilight dpi` reads the value in force plus the range the
-  device lists, `logilight dpi 1600` writes one (snapped to the nearest value
-  the device accepts, then read back), and the settings window shows a slider
-  with the same range.
-- `−` and `+` beside the DPI slider, stepping by the device's DPI step (50),
-  so it lands on a round number without dragging.
-- `logilight release` returns LED control to the device's firmware
-  (`0x8071` software control), so a mouse that was painted with a solid colour
-  shows its own effect again without a power cycle.
 - Menu bar item with the light state, _Off / On / Schedule_, _Open LogiLight_,
   and _Quit_. The icon dims while the lights are off and its tooltip names the
   current state.
@@ -25,28 +16,30 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- In captured mode a device whose live colour cannot be read is left untouched:
-  without the "before" colour there is nothing to restore, and writing the
-  fallback over an onboard effect lost it (the G102 LIGHTSYNC reports no
-  `0x8070`, so it kept turning white every morning).
-
+- At dawn the agent no longer paints a colour: it hands LED control back to the
+  device's firmware (`0x8071` software control), so the mouse's own effect — or
+  whatever G HUB last applied — returns. Only a device that cannot be released
+  is repainted, with the colour captured at lights-out.
+- Lights-out now writes every lighting device, including one that cannot report
+  its colour. The G102 LIGHTSYNC has no `0x8070` read-back, and skipping it left
+  the lights on all night.
+- The first tick after a restart applies the clock's phase even when the state
+  file says it is already applied, so a lost permission or a reinstall cannot
+  leave the lights in the wrong state until the next boundary.
+- The window says "no mouse found" instead of claiming the lights are off when
+  no device answered.
 - A manual _On_ or _Off_ now holds until another state is chosen, instead of
-  lapsing at the next scheduled boundary. Turning the lights off by hand keeps
-  them off through the night and the next morning until _Schedule_ (or
-  `logilight auto`) hands control back to the timetable.
+  lapsing at the next scheduled boundary.
 - A colour write that HID++ drops is retried up to three times, half a second
-  apart, and the log names every attempt. An idle device no longer leaves the
-  lights in the previous phase until the next 30 s tick.
+  apart, and the log names every attempt.
 - A tick that could not reach the device is re-evaluated after 2 s instead of
   waiting for the next scheduled tick.
 - `install` retries the `launchctl bootstrap` that follows `bootout`, which
   launchd could reject with `Bootstrap failed: 5` while the old job was still
   shutting down, leaving the agent stopped.
-- The settings app is now a background agent: `LSUIElement` plus a `.accessory`
+- The settings app is a background agent: `LSUIElement` plus a `.accessory`
   activation policy, so it has no Dock tile, no ⌘-Tab entry and no row in the
-  Force Quit window. Closing the window hides it, reopening comes from the menu
-  bar or by launching the app again, and the app keeps following the schedule
-  either way.
+  Force Quit window.
 - Time entry no longer depends on parsing typed text: the pickers cannot hold an
   invalid time, and a 2-second refresh no longer overwrites the value being
   edited.
