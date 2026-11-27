@@ -26,12 +26,17 @@ extension AppDelegate {
         let off = status["off"] as? String ?? "?"
         let on = status["on"] as? String ?? "?"
 
+        let devices = status["devices"] as? [String] ?? []
         updateStatusItem(phase: phase)
         // The headline states the situation; the schedule lives in the stats
-        // strip, so nothing here reads as a button to press.
-        statusLabel.stringValue = phase == "off" ? text.statusOffLine : text.statusOnLine
+        // strip, so nothing here reads as a button to press. With no device
+        // answering, the clock's phase says nothing about the LEDs, so say that
+        // instead of claiming they are off.
+        statusLabel.stringValue = devices.isEmpty
+            ? text.statusNoDevice
+            : (phase == "off" ? text.statusOffLine : text.statusOnLine)
 
-        var detail = device
+        var detail = devices.isEmpty ? text.statusNoDevice : device
         if manual {
             detail += " · " + text.manualHold
         } else if let next = status["next"] as? String, !next.isEmpty {

@@ -58,6 +58,7 @@ struct Strings {
     /// Headline: what the lights are doing right now.
     let statusOnLine: String
     let statusOffLine: String
+    let statusNoDevice: String
     /// Detail line while a manual choice overrides the schedule.
     let manualHold: String
 
@@ -111,6 +112,7 @@ struct Strings {
         autoSaved: "Saved",
         statusOnLine: "Lights are on",
         statusOffLine: "Lights are off",
+        statusNoDevice: "No mouse found",
         manualHold: "set by hand — choose Schedule to follow the times again",
         menuOpenWindow: "Open LogiLight",
         menuOff: "Lights off now",
@@ -161,6 +163,7 @@ struct Strings {
         autoSaved: "已保存",
         statusOnLine: "灯光已打开",
         statusOffLine: "灯光已关闭",
+        statusNoDevice: "未找到鼠标",
         manualHold: "手动设置中，选「定时」才恢复自动",
         menuOpenWindow: "打开 LogiLight",
         menuOff: "立即关灯",
