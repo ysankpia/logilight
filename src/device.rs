@@ -227,17 +227,17 @@ pub async fn apply_off(config: &Config, state: &mut State) -> Result<Vec<Applied
     for device in devices {
         match config.restore.mode {
             RestoreMode::Fixed => wanted.push(device),
-            RestoreMode::Captured => match read_color(&device.route).await {
-                // A colour that is already black means there is nothing worth
-                // restoring; recording it would leave the mouse dark at dawn.
-                Ok(Some(color)) => {
+            RestoreMode::Captured => {
+                if let Ok(Some(color)) = read_color(&device.route).await {
+                    // A colour that is already black means there is nothing
+                    // worth restoring; recording it would leave the mouse dark
+                    // at dawn.
                     if color != OFF_COLOR {
                         state.captured.insert(device.key(), format_hex_color(color));
                     }
                     wanted.push(device);
                 }
-                Ok(None) | Err(_) => {}
-            },
+            }
         }
     }
     apply_rgb_to(&wanted, OFF_COLOR).await
