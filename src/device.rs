@@ -15,7 +15,7 @@ use openlogi_hid::{DeviceRoute, dump_features};
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::config::{Config, OFF_COLOR, RestoreMode, state_path};
+use crate::config::{Config, OFF_COLOR, state_path};
 use crate::state::{AppliedDevice, State};
 use crate::util::{Rgb, format_hex_color, now_local};
 
@@ -29,6 +29,9 @@ const COLOR_LED_EFFECTS: u16 = 0x8070;
 /// `RgbEffects` feature id: the engine a device without `0x8070` writes
 /// through, and the one whose software-control flag has to be handed back.
 const RGB_EFFECTS: u16 = 0x8071;
+
+/// What `AppliedDevice.color` says when the device took its LEDs back.
+pub const RELEASED: &str = "released";
 
 /// Attempts per colour write. An idle device drops the first HID++ request
 /// after a wake, and a channel the pool replaced mid-flight fails the same
@@ -220,58 +223,57 @@ fn finish_apply(applied: Vec<AppliedDevice>, failures: Vec<String>) -> Result<Ve
     Ok(applied)
 }
 
-/// Turn lighting off, capturing each device's live colour first.
+/// Turn lighting off.
 ///
-/// Captured mode only drives devices that can report their current colour:
-/// without the "before" colour there is nothing to restore in the morning, and
-/// writing black over an onboard effect would lose it. A device that cannot be
-/// read (no `0x8070`, as on the G102) keeps whatever effect it runs.
+/// Every lighting device is written, including one that cannot report its
+/// colour: the G102 has no `0x8070` read-back, and skipping it would leave the
+/// lights on all night. The colour is still captured where it can be read, for
+/// the devices that have to be repainted at dawn.
 pub async fn apply_off(config: &Config, state: &mut State) -> Result<Vec<AppliedDevice>> {
     let devices = lighting_devices(config, false).await?;
-    let mut wanted = Vec::new();
-    for device in devices {
-        match config.restore.mode {
-            RestoreMode::Fixed => wanted.push(device),
-            RestoreMode::Captured => {
-                if let Ok(Some(color)) = read_color(&device.route).await {
-                    // A colour that is already black means there is nothing
-                    // worth restoring; recording it would leave the mouse dark
-                    // at dawn.
-                    if color != OFF_COLOR {
-                        state.captured.insert(device.key(), format_hex_color(color));
-                    }
-                    wanted.push(device);
-                }
+    for device in &devices {
+        if let Ok(Some(color)) = read_color(&device.route).await {
+            // A colour that is already black means there is nothing worth
+            // restoring; recording it would leave the mouse dark at dawn.
+            if color != OFF_COLOR {
+                state.captured.insert(device.key(), format_hex_color(color));
             }
         }
     }
-    apply_rgb_to(&wanted, OFF_COLOR).await
+    apply_rgb_to(&devices, OFF_COLOR).await
 }
 
-/// The colour to write when the off window ends.
+/// Hand the lights back when the off window ends.
+///
+/// Releasing is the point: the device's own effect (or whatever G HUB last
+/// applied) returns without this tool knowing what it was. Only a device that
+/// cannot be released is repainted, with the colour captured at lights-out.
 pub async fn apply_on_color(config: &Config, state: &mut State) -> Result<Vec<AppliedDevice>> {
     let devices = lighting_devices(config, false).await?;
     let fallback = crate::util::parse_hex_color(&config.restore.fallback)?;
-    let fixed = crate::util::parse_hex_color(&config.restore.color)?;
     let mut applied = Vec::new();
     let mut failures = Vec::new();
     for device in &devices {
-        let color = match config.restore.mode {
-            RestoreMode::Fixed => fixed,
-            RestoreMode::Captured => {
-                // The same rule as lights-out: a device that cannot report its
-                // colour keeps its own effect instead of being painted with the
-                // fallback every morning.
-                if !matches!(read_color(&device.route).await, Ok(Some(_))) {
-                    continue;
-                }
-                state
-                    .captured
-                    .get(&device.key())
-                    .and_then(|hex| crate::util::parse_hex_color(hex).ok())
-                    .unwrap_or(fallback)
+        match release_lighting(&device.route).await {
+            Ok(true) => {
+                applied.push(AppliedDevice {
+                    name: device.name.clone(),
+                    route: device.route.to_string(),
+                    color: RELEASED.to_string(),
+                });
+                continue;
             }
-        };
+            Ok(false) => {}
+            Err(error) => {
+                failures.push(format!("{}: {error}", device.name));
+                continue;
+            }
+        }
+        let color = state
+            .captured
+            .get(&device.key())
+            .and_then(|hex| crate::util::parse_hex_color(hex).ok())
+            .unwrap_or(fallback);
         match write_color(&device.route, color).await {
             Ok(()) => applied.push(AppliedDevice {
                 name: device.name.clone(),
@@ -382,11 +384,11 @@ pub async fn power_config(route: &DeviceRoute) -> Result<Option<PowerConfig>> {
     Ok(Some(PowerConfig::from_raw(&config)))
 }
 
-/// Ask the device to turn its own lighting off after `minutes` without input.
+/// Ask the device to turn its own lighting off after `seconds` without input.
 ///
 /// This is the "lighting sleep timer" the hardware ships with: the firmware
 /// counts the idle time, so nothing has to stay running. `0` disables it.
-pub async fn set_idle_off(route: &DeviceRoute, minutes: u16) -> Result<PowerConfig> {
+pub async fn set_idle_off(route: &DeviceRoute, seconds: u16) -> Result<PowerConfig> {
     let Some((_device, feature)) = open_rgb_effects(route).await? else {
         return Err(anyhow!("{route} has no 0x8071 engine"));
     };
@@ -394,7 +396,7 @@ pub async fn set_idle_off(route: &DeviceRoute, minutes: u16) -> Result<PowerConf
         .get_power_mode_config()
         .await
         .map_err(|error| anyhow!("read 0x8071 power mode on {route}: {error}"))?;
-    config.no_activity_timeout_to_off = minutes.saturating_mul(60);
+    config.no_activity_timeout_to_off = seconds;
     feature
         .set_power_mode_config(config)
         .await

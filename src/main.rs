@@ -17,7 +17,7 @@ mod util;
 
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 
 use crate::config::Config;
@@ -57,8 +57,9 @@ enum Command {
     Release,
     /// Read or set the device's own idle-lighting sleep timer.
     Idle {
-        /// Minutes without input before the lights go off; 0 disables it.
-        minutes: Option<u16>,
+        /// Duration without input before the lights go off: `30s`, `10m`, `1h`,
+        /// or a bare number of minutes. `0` disables it.
+        duration: Option<String>,
     },
     /// Hand lighting back to the schedule and apply the phase it wants now.
     Auto,
@@ -189,7 +190,7 @@ fn main() -> Result<()> {
                 Ok(())
             })
         }
-        Command::Idle { minutes } => {
+        Command::Idle { duration } => {
             let runtime = util::runtime()?;
             runtime.block_on(async {
                 let devices = device::lighting_devices(&config, false).await?;
@@ -197,8 +198,10 @@ fn main() -> Result<()> {
                     println!("no lighting devices found");
                 }
                 for found in &devices {
-                    let report = match minutes {
-                        Some(minutes) => device::set_idle_off(&found.route, minutes).await?,
+                    let report = match duration.as_deref() {
+                        Some(value) => {
+                            device::set_idle_off(&found.route, parse_idle(&value)?).await?
+                        }
                         None => match device::power_config(&found.route).await? {
                             Some(report) => report,
                             None => {
@@ -301,4 +304,21 @@ async fn doctor(config: &Config, config_path: &std::path::Path) -> Result<()> {
         schedule.on
     );
     Ok(())
+}
+
+/// `10s`, `5m`, `1h`, or a bare number of minutes, as seconds.
+fn parse_idle(value: &str) -> Result<u16> {
+    let (number, unit) = if let Some(rest) = value.strip_suffix('s') {
+        (rest, 1u32)
+    } else if let Some(rest) = value.strip_suffix('m') {
+        (rest, 60)
+    } else if let Some(rest) = value.strip_suffix('h') {
+        (rest, 3_600)
+    } else {
+        (value, 60)
+    };
+    let count: u32 = number
+        .parse()
+        .with_context(|| format!("{value} is not a duration like 30s, 10m or 1h"))?;
+    Ok(count.saturating_mul(unit).min(u32::from(u16::MAX)) as u16)
 }

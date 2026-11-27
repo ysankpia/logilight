@@ -305,7 +305,13 @@ fn wanted_on_color(config: &Config, state: &State, device: &FoundDevice) -> Rgb 
 fn describe(applied: &[AppliedDevice]) -> String {
     applied
         .iter()
-        .map(|entry| format!("{} → #{}", entry.name, entry.color))
+        .map(|entry| {
+            if entry.color == device::RELEASED {
+                format!("{} → released", entry.name)
+            } else {
+                format!("{} → #{}", entry.name, entry.color)
+            }
+        })
         .collect::<Vec<_>>()
         .join(", ")
 }
