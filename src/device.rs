@@ -9,7 +9,7 @@
 use anyhow::{Context, Result, anyhow};
 use hidpp::device::Device;
 use hidpp::feature::color_led_effects::ColorLedEffectsFeature;
-use hidpp::feature::rgb_effects::{RgbEffectsFeature, SwControlFlags};
+use hidpp::feature::rgb_effects::{RgbEffectsFeature, RgbPowerModeConfig, SwControlFlags};
 use openlogi_core::device::{DeviceInventory, DeviceKind};
 use openlogi_hid::{DeviceRoute, dump_features};
 use std::sync::Arc;
@@ -326,6 +326,84 @@ pub async fn read_color(route: &DeviceRoute) -> Result<Option<Rgb>> {
         }
     }
     Ok(last)
+}
+
+/// The device's own idle-lighting configuration: how long without activity
+/// before the RGB engine dims, and before it goes dark.
+#[derive(Debug, Clone, Copy)]
+pub struct PowerConfig {
+    pub flags: u16,
+    pub power_save_seconds: u16,
+    pub off_seconds: u16,
+}
+
+impl PowerConfig {
+    fn from_raw(config: &RgbPowerModeConfig) -> Self {
+        Self {
+            flags: config.flags,
+            power_save_seconds: config.no_activity_timeout_to_power_save,
+            off_seconds: config.no_activity_timeout_to_off,
+        }
+    }
+}
+
+/// Open a device and resolve its `0x8071` engine, if it has one.
+async fn open_rgb_effects(route: &DeviceRoute) -> Result<Option<(Device, Arc<RgbEffectsFeature>)>> {
+    let pool = openlogi_hid::channel_pool();
+    let channel = pool
+        .open(route)
+        .await
+        .map_err(|error| anyhow!("open {}: {error}", route))?
+        .ok_or_else(|| anyhow!("device not connected: {route}"))?;
+    let mut device = Device::new(Arc::clone(&channel), route.device_index())
+        .await
+        .map_err(|error| anyhow!("initialize device {route}: {error}"))?;
+    let Some(info) = device
+        .root()
+        .get_feature(RGB_EFFECTS)
+        .await
+        .map_err(|error| anyhow!("resolve 0x8071 on {route}: {error}"))?
+    else {
+        return Ok(None);
+    };
+    let feature = device.add_feature::<RgbEffectsFeature>(info.index);
+    Ok(Some((device, feature)))
+}
+
+/// Read the idle-lighting timeouts from the device, when it has the engine.
+pub async fn power_config(route: &DeviceRoute) -> Result<Option<PowerConfig>> {
+    let Some((_device, feature)) = open_rgb_effects(route).await? else {
+        return Ok(None);
+    };
+    let config = feature
+        .get_power_mode_config()
+        .await
+        .map_err(|error| anyhow!("read 0x8071 power mode on {route}: {error}"))?;
+    Ok(Some(PowerConfig::from_raw(&config)))
+}
+
+/// Ask the device to turn its own lighting off after `minutes` without input.
+///
+/// This is the "lighting sleep timer" the hardware ships with: the firmware
+/// counts the idle time, so nothing has to stay running. `0` disables it.
+pub async fn set_idle_off(route: &DeviceRoute, minutes: u16) -> Result<PowerConfig> {
+    let Some((_device, feature)) = open_rgb_effects(route).await? else {
+        return Err(anyhow!("{route} has no 0x8071 engine"));
+    };
+    let mut config = feature
+        .get_power_mode_config()
+        .await
+        .map_err(|error| anyhow!("read 0x8071 power mode on {route}: {error}"))?;
+    config.no_activity_timeout_to_off = minutes.saturating_mul(60);
+    feature
+        .set_power_mode_config(config)
+        .await
+        .map_err(|error| anyhow!("write 0x8071 power mode on {route}: {error}"))?;
+    let after = feature
+        .get_power_mode_config()
+        .await
+        .map_err(|error| anyhow!("read 0x8071 power mode back on {route}: {error}"))?;
+    Ok(PowerConfig::from_raw(&after))
 }
 
 /// Hand LED control back to the firmware so the device shows its own effect.

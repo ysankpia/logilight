@@ -55,6 +55,11 @@ enum Command {
     },
     /// Hand the lights back to the device's own effect.
     Release,
+    /// Read or set the device's own idle-lighting sleep timer.
+    Idle {
+        /// Minutes without input before the lights go off; 0 disables it.
+        minutes: Option<u16>,
+    },
     /// Hand lighting back to the schedule and apply the phase it wants now.
     Auto,
     /// Show the schedule, devices, and last applied state.
@@ -181,6 +186,32 @@ fn main() -> Result<()> {
                     }
                 }
                 println!("released {released} device(s)");
+                Ok(())
+            })
+        }
+        Command::Idle { minutes } => {
+            let runtime = util::runtime()?;
+            runtime.block_on(async {
+                let devices = device::lighting_devices(&config, false).await?;
+                if devices.is_empty() {
+                    println!("no lighting devices found");
+                }
+                for found in &devices {
+                    let report = match minutes {
+                        Some(minutes) => device::set_idle_off(&found.route, minutes).await?,
+                        None => match device::power_config(&found.route).await? {
+                            Some(report) => report,
+                            None => {
+                                println!("{}: no 0x8071 power-mode support", found.name);
+                                continue;
+                            }
+                        },
+                    };
+                    println!(
+                        "{}: power-save after {}s, off after {}s (flags 0x{:04x})",
+                        found.name, report.power_save_seconds, report.off_seconds, report.flags
+                    );
+                }
                 Ok(())
             })
         }
