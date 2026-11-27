@@ -9,7 +9,6 @@ mod config;
 mod control;
 mod daemon;
 mod device;
-mod dpi;
 mod launchd;
 mod schedule;
 mod state;
@@ -17,7 +16,7 @@ mod util;
 
 use std::path::PathBuf;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 use crate::config::Config;
@@ -39,30 +38,6 @@ struct Cli {
 enum Command {
     /// Run the scheduler in the foreground.
     Daemon(daemon::DaemonArgs),
-    /// Turn every selected device's lighting off now.
-    Off,
-    /// Restore lighting now (the colour captured before the last "off").
-    On,
-    /// Apply a solid colour now (`RRGGBB`, no `#`).
-    Color {
-        /// Colour as six hex digits.
-        color: String,
-    },
-    /// Read the pointer's DPI, or set it to a value the device accepts.
-    Dpi {
-        /// Target DPI; omitted means read only.
-        value: Option<u16>,
-    },
-    /// Hand the lights back to the device's own effect.
-    Release,
-    /// Read or set the device's own idle-lighting sleep timer.
-    Idle {
-        /// Duration without input before the lights go off: `30s`, `10m`, `1h`,
-        /// or a bare number of minutes. `0` disables it.
-        duration: Option<String>,
-    },
-    /// Hand lighting back to the schedule and apply the phase it wants now.
-    Auto,
     /// Show the schedule, devices, and last applied state.
     Status,
     /// Print the resolved config path and its contents.
@@ -100,144 +75,6 @@ fn main() -> Result<()> {
 
     match command {
         Command::Daemon(args) => daemon::run(config, config_path, args),
-        Command::Off => {
-            let runtime = util::runtime()?;
-            runtime.block_on(async {
-                let mut state = state::State::load(&config_path);
-                let applied = device::apply_off(&config, &mut state).await?;
-                state.record("off", "manual", &applied)?;
-                // A hand-set phase holds until it is changed by hand again:
-                // turning the lights off at noon must not undo itself at dawn.
-                state.set_manual("off", None);
-                state.save(&config_path)?;
-                println!("lighting off — {} device(s) updated", applied.len());
-                Ok(())
-            })
-        }
-        Command::On => {
-            let runtime = util::runtime()?;
-            runtime.block_on(async {
-                let mut state = state::State::load(&config_path);
-                let applied = device::apply_on_color(&config, &mut state).await?;
-                state.record("on", "manual", &applied)?;
-                state.set_manual("on", None);
-                state.save(&config_path)?;
-                println!("lighting restored — {} device(s) updated", applied.len());
-                Ok(())
-            })
-        }
-        Command::Color { color } => {
-            let rgb = util::parse_hex_color(&color)?;
-            let runtime = util::runtime()?;
-            runtime.block_on(async {
-                let applied = device::apply_rgb(&config, rgb).await?;
-                let mut state = state::State::load(&config_path);
-                // A colour chosen by hand is the colour to restore at dawn:
-                // recording it here keeps the scheduler from resurrecting a
-                // stale capture after the next lights-out.
-                if rgb != config::OFF_COLOR {
-                    device::remember_colors(&mut state, &applied);
-                }
-                let phase = if rgb == config::OFF_COLOR {
-                    "off"
-                } else {
-                    "on"
-                };
-                state.record(phase, "manual", &applied)?;
-                state.set_manual(phase, None);
-                state.save(&config_path)?;
-                println!(
-                    "applied #{} — {} device(s) updated",
-                    util::format_hex_color(rgb),
-                    applied.len()
-                );
-                Ok(())
-            })
-        }
-        Command::Dpi { value } => {
-            let runtime = util::runtime()?;
-            runtime.block_on(async {
-                let report = match value {
-                    Some(target) => dpi::write(&config, target).await?,
-                    None => dpi::read(&config).await?,
-                };
-                println!(
-                    "dpi: {} (range {}–{}, step {}, {} values)",
-                    report.current, report.min, report.max, report.step, report.values
-                );
-                Ok(())
-            })
-        }
-        Command::Release => {
-            let runtime = util::runtime()?;
-            runtime.block_on(async {
-                let devices = device::lighting_devices(&config, false).await?;
-                if devices.is_empty() {
-                    println!("no lighting devices found");
-                }
-                let mut released = 0;
-                for found in &devices {
-                    match device::release_lighting(&found.route).await {
-                        Ok(true) => {
-                            released += 1;
-                            println!("{}: lights back to the device", found.name);
-                        }
-                        Ok(false) => println!("{}: already the device's own", found.name),
-                        Err(error) => eprintln!("warning: {}: {error:#}", found.name),
-                    }
-                }
-                println!("released {released} device(s)");
-                Ok(())
-            })
-        }
-        Command::Idle { duration } => {
-            let runtime = util::runtime()?;
-            runtime.block_on(async {
-                let devices = device::lighting_devices(&config, false).await?;
-                if devices.is_empty() {
-                    println!("no lighting devices found");
-                }
-                for found in &devices {
-                    let report = match duration.as_deref() {
-                        Some(value) => {
-                            device::set_idle_off(&found.route, parse_idle(&value)?).await?
-                        }
-                        None => match device::power_config(&found.route).await? {
-                            Some(report) => report,
-                            None => {
-                                println!("{}: no 0x8071 power-mode support", found.name);
-                                continue;
-                            }
-                        },
-                    };
-                    println!(
-                        "{}: power-save after {}s, off after {}s (flags 0x{:04x})",
-                        found.name, report.power_save_seconds, report.off_seconds, report.flags
-                    );
-                }
-                Ok(())
-            })
-        }
-        Command::Auto => {
-            let runtime = util::runtime()?;
-            runtime.block_on(async {
-                let mut state = state::State::load(&config_path);
-                state.clear_manual();
-                let phase = schedule::phase_at(&config.schedule, util::now_local());
-                let applied = device::apply_phase(&config, &mut state, phase).await?;
-                let name = match phase {
-                    schedule::Phase::Off => "off",
-                    schedule::Phase::On => "on",
-                };
-                state.record(name, "scheduled", &applied)?;
-                state.save(&config_path)?;
-                println!(
-                    "following the schedule — {name}, {} device(s) updated",
-                    applied.len()
-                );
-                Ok(())
-            })
-        }
         Command::Status => {
             let runtime = util::runtime()?;
             runtime.block_on(device::print_status(&config, &config_path))
@@ -304,21 +141,4 @@ async fn doctor(config: &Config, config_path: &std::path::Path) -> Result<()> {
         schedule.on
     );
     Ok(())
-}
-
-/// `10s`, `5m`, `1h`, or a bare number of minutes, as seconds.
-fn parse_idle(value: &str) -> Result<u16> {
-    let (number, unit) = if let Some(rest) = value.strip_suffix('s') {
-        (rest, 1u32)
-    } else if let Some(rest) = value.strip_suffix('m') {
-        (rest, 60)
-    } else if let Some(rest) = value.strip_suffix('h') {
-        (rest, 3_600)
-    } else {
-        (value, 60)
-    };
-    let count: u32 = number
-        .parse()
-        .with_context(|| format!("{value} is not a duration like 30s, 10m or 1h"))?;
-    Ok(count.saturating_mul(unit).min(u32::from(u16::MAX)) as u16)
 }

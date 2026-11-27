@@ -15,22 +15,15 @@ struct Strings {
     let nextChange: String
     let noPermission: String
     let captionSchedule: String
-    let captionCaptured: String
     let captionAction: String
 
     let rowOff: String
     let rowOn: String
-    let rowMode: String
-    let rowColor: String
     let rowLanguage: String
-    let rowDpi: String
     let actionFailed: String
 
-    let modeCaptured: String
-    let modeFixed: String
     let languageSystem: String
 
-    let applyNow: String
     let openPrivacy: String
     let restartAgent: String
     let never: String
@@ -80,19 +73,12 @@ struct Strings {
         nextChange: "Next change: %@",
         noPermission: "Input Monitoring is NOT granted — the agent cannot reach the mouse.",
         captionSchedule: "SCHEDULE",
-        captionCaptured: "NIGHT COLOUR",
         captionAction: "LAST ACTION",
         rowOff: "Lights off at",
         rowOn: "Lights on at",
-        rowMode: "Morning colour",
-        rowColor: "Fixed colour",
         rowLanguage: "Language",
-        rowDpi: "DPI",
         actionFailed: "Action failed",
-        modeCaptured: "Restore the colour it had",
-        modeFixed: "Always use a fixed colour",
         languageSystem: "Follow system",
-        applyNow: "Apply colour now",
         openPrivacy: "System permissions…",
         restartAgent: "Restart agent",
         never: "never",
@@ -131,19 +117,12 @@ struct Strings {
         nextChange: "下次切换：%@",
         noPermission: "尚未授予“输入监控”权限，后台服务无法访问鼠标。",
         captionSchedule: "定时",
-        captionCaptured: "夜间颜色",
         captionAction: "上次操作",
         rowOff: "关灯时间",
         rowOn: "开灯时间",
-        rowMode: "早晨颜色",
-        rowColor: "固定颜色",
         rowLanguage: "语言",
-        rowDpi: "DPI",
         actionFailed: "操作失败",
-        modeCaptured: "恢复关灯前的颜色",
-        modeFixed: "始终使用固定颜色",
         languageSystem: "跟随系统",
-        applyNow: "应用当前颜色",
         openPrivacy: "系统权限设置…",
         restartAgent: "重启服务",
         never: "从未",

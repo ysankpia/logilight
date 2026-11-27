@@ -14,7 +14,6 @@ extension AppDelegate {
             detailLabel.stringValue = String(format: text.agentDownHint, Int(getuid()))
             permissionLabel.isHidden = true
             scheduleValue.stringValue = "—"
-            capturedValue.stringValue = "—"
             actionValue.stringValue = "—"
             updateStatusItem(phase: nil)
             return
@@ -60,7 +59,6 @@ extension AppDelegate {
         permissionLabel.isHidden = permission
 
         scheduleValue.stringValue = "\(off) → \(on)"
-        capturedValue.stringValue = "#\(status["captured"] as? String ?? "—")"
         actionValue.stringValue = "\(actionName(status["action"] as? String ?? "")) · \(readable(status["updated"] as? String))"
 
         // The agent is the source of truth, so the pickers follow it, except
@@ -69,10 +67,6 @@ extension AppDelegate {
         if !editingTimes, !busy {
             offPicker.dateValue = date(fromClock: status["off"] as? String ?? "22:00")
             onPicker.dateValue = date(fromClock: status["on"] as? String ?? "07:00")
-        }
-        modePopup.selectItem(at: (status["mode"] as? String) == "fixed" ? 1 : 0)
-        if !colorWell.isActive {
-            colorWell.color = nsColor(hex: status["color"] as? String ?? "ffffff")
         }
     }
 

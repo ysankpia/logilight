@@ -22,8 +22,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate, N
 
     var scheduleValue: NSTextField!
 
-    var capturedValue: NSTextField!
-
     var actionValue: NSTextField!
 
     var offPicker: NSDatePicker!
@@ -35,19 +33,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate, N
 
     var onFieldRow: NSView!
 
-    var modePopup: NSPopUpButton!
-
-    var colorWell: NSColorWell!
-
     var languagePopup: NSPopUpButton!
 
     var lightStateControl: NSSegmentedControl!
 
     var savedLabel: NSTextField!
-    var dpiSlider: NSSlider!
-    var dpiMinus: NSButton!
-    var dpiPlus: NSButton!
-    var dpiValue: NSTextField!
 
     var refreshTimer: Timer?
 

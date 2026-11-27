@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 use anyhow::Result;
 use clap::Args;
 
-use crate::config::{Config, OFF_COLOR, RestoreMode};
+use crate::config::{Config, OFF_COLOR};
 use crate::device::{self, FoundDevice};
 use crate::schedule::{Phase, next_boundary, phase_at};
 use crate::state::{AppliedDevice, State};
@@ -300,14 +300,11 @@ impl Scheduler {
 /// The colour the "on" phase should show for one device.
 fn wanted_on_color(config: &Config, state: &State, device: &FoundDevice) -> Rgb {
     let fallback = parse_hex_color(&config.restore.fallback).unwrap_or(Rgb::new(255, 255, 255));
-    match config.restore.mode {
-        RestoreMode::Fixed => parse_hex_color(&config.restore.color).unwrap_or(fallback),
-        RestoreMode::Captured => state
-            .captured
-            .get(&device.key())
-            .and_then(|hex| parse_hex_color(hex).ok())
-            .unwrap_or(fallback),
-    }
+    state
+        .captured
+        .get(&device.key())
+        .and_then(|hex| parse_hex_color(hex).ok())
+        .unwrap_or(fallback)
 }
 
 fn describe(applied: &[AppliedDevice]) -> String {

@@ -56,28 +56,6 @@ extension AppDelegate {
         }
     }
 
-    func saveRestore() {
-        let mode = modePopup.indexOfSelectedItem == 1 ? "fixed" : "captured"
-        autoSave("restore \(mode) \(hexString(colorWell.color))")
-    }
-
-    @objc func modeChanged() {
-        saveRestore()
-    }
-
-    /// Picking a colour stores it and applies it, the way the well previously
-    /// needed a separate "apply" click.
-    @objc func colourChanged() {
-        guard !busy else { return }
-        let hex = hexString(colorWell.color)
-        autoSave("restore \(modePopup.indexOfSelectedItem == 1 ? "fixed" : "captured") \(hex)")
-        run("color \(hex)", describe: strings.actionColour)
-    }
-
-    @objc func applyColor() {
-        run("color \(hexString(colorWell.color))", describe: strings.actionColour)
-    }
-
     @objc func openPrivacy() {
         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")!
         NSWorkspace.shared.open(url)

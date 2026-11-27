@@ -75,7 +75,6 @@ extension AppDelegate {
         permissionLabel.isHidden = true
 
         scheduleValue = label("—")
-        capturedValue = label("—")
         actionValue = label("—")
 
         // A clock-time picker instead of a text field: the hours and minutes
@@ -84,22 +83,6 @@ extension AppDelegate {
         // which keeps it a 24-hour `22:00` control like the config file.
         offPicker = timePicker("22:00", &offFieldRow)
         onPicker = timePicker("07:00", &onFieldRow)
-
-        modePopup = NSPopUpButton()
-        modePopup.addItems(withTitles: [text.modeCaptured, text.modeFixed])
-        modePopup.target = self
-        modePopup.action = #selector(modeChanged)
-
-        // A colour well is a tiny square by nature; give it real size so it is
-        // obvious it can be clicked.
-        colorWell = NSColorWell()
-        colorWell.color = nsColor(hex: "3366ff")
-        colorWell.widthAnchor.constraint(equalToConstant: 92).isActive = true
-        colorWell.heightAnchor.constraint(equalToConstant: 28).isActive = true
-        // Fire once when the picker settles, not on every drag step.
-        colorWell.isContinuous = false
-        colorWell.target = self
-        colorWell.action = #selector(colourChanged)
 
         languagePopup = NSPopUpButton()
         languagePopup.addItems(withTitles: [
@@ -128,38 +111,6 @@ extension AppDelegate {
         lightStateControl.selectedSegment = 0
         lightStateControl.widthAnchor.constraint(equalToConstant: 204).isActive = true
 
-        // DPI is read once when the window opens, not polled: the value lives in
-        // the mouse, and every read opens the HID device.
-        dpiSlider = NSSlider(
-            value: 1600,
-            minValue: 100,
-            maxValue: 25600,
-            target: self,
-            action: #selector(dpiChanged)
-        )
-        dpiSlider.isContinuous = false
-        dpiSlider.widthAnchor.constraint(equalToConstant: 208).isActive = true
-        dpiValue = label("—")
-        dpiValue.widthAnchor.constraint(equalToConstant: 56).isActive = true
-        // A drag cannot land on a round DPI, and the device only accepts
-        // multiples of its step.
-        dpiMinus = button("−", action: #selector(dpiStepDown))
-        dpiMinus.widthAnchor.constraint(equalToConstant: 30).isActive = true
-        dpiPlus = button("+", action: #selector(dpiStepUp))
-        dpiPlus.widthAnchor.constraint(equalToConstant: 30).isActive = true
-        let dpiRow = NSStackView(views: [dpiMinus, dpiSlider, dpiPlus, dpiValue])
-        dpiRow.orientation = .horizontal
-        dpiRow.alignment = .centerY
-        dpiRow.spacing = 8
-
-        let colorButton = button(text.applyNow, action: #selector(applyColor))
-
-        // Group the colour well with its action so it reads as one control.
-        let colorRow = NSStackView(views: [colorWell, colorButton])
-        colorRow.orientation = .horizontal
-        colorRow.alignment = .centerY
-        colorRow.spacing = 10
-
         func row(_ title: String, _ control: NSView) -> NSStackView {
             let name = label(title)
             name.alignment = .right
@@ -172,11 +123,8 @@ extension AppDelegate {
         }
         let settings = NSStackView(views: [
             row(text.rowLightState, lightStateControl),
-            row(text.rowDpi, dpiRow),
             row(text.rowOff, offFieldRow),
             row(text.rowOn, onFieldRow),
-            row(text.rowMode, modePopup),
-            row(text.rowColor, colorRow),
             row(text.rowLanguage, languagePopup),
         ])
         settings.orientation = .vertical
@@ -193,7 +141,6 @@ extension AppDelegate {
         // facts instead of a paragraph.
         let stats = NSStackView(views: [
             stat(text.captionSchedule, scheduleValue),
-            stat(text.captionCaptured, capturedValue),
             stat(text.captionAction, actionValue),
         ])
         stats.orientation = .horizontal
@@ -264,7 +211,6 @@ extension AppDelegate {
         // Placing the window on screen is all `buildWindow` does; whether the
         // app then takes focus is up to the caller (see `showWindow`).
         window.orderFront(nil)
-        loadDpi()
     }
 
     // Closing the window hides it instead of dismantling the app.

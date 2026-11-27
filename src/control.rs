@@ -14,12 +14,12 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::Mutex;
 
-use crate::config::{Config, RestoreMode};
+use crate::config::Config;
 use crate::daemon::Scheduler;
 use crate::device;
 use crate::schedule::{next_boundary, parse_clock, phase_at};
 use crate::state::State;
-use crate::util::{format_hex_color, now_local, parse_hex_color};
+use crate::util::now_local;
 
 /// Where the settings window connects.
 #[must_use]
@@ -175,39 +175,6 @@ async fn dispatch(
             state.save(config_path)?;
             Ok(applied_json(&applied))
         }
-        "color" => {
-            let hex = parts.next().context("color needs RRGGBB")?;
-            let color = parse_hex_color(hex)?;
-            let scheduler = scheduler.lock().await;
-            let applied = device::apply_rgb(&scheduler.config, color).await?;
-            let mut state = State::load(config_path);
-            state.record("on", "manual", &applied)?;
-            state.set_manual("on", None);
-            state.save(config_path)?;
-            Ok(applied_json(&applied))
-        }
-        // DPI lives in the device, so this reads and writes hardware rather than
-        // anything in the config file.
-        "dpi" => {
-            let config = scheduler.lock().await.config.clone();
-            let report = match parts.next() {
-                Some(value) => {
-                    let target = value.parse().context("dpi needs a number")?;
-                    crate::dpi::write(&config, target).await?
-                }
-                None => crate::dpi::read(&config).await?,
-            };
-            Ok(serde_json::json!({
-                "ok": true,
-                "current": report.current,
-                "min": report.min,
-                "max": report.max,
-                "step": report.step,
-                "values": report.values,
-            })
-            .to_string())
-        }
-        // Hand control back to the schedule and settle on the scheduled phase.
         "auto" => {
             let scheduler = scheduler.lock().await;
             let mut state = State::load(config_path);
@@ -230,23 +197,6 @@ async fn dispatch(
             let mut scheduler = scheduler.lock().await;
             scheduler.config.schedule.off = off.to_string();
             scheduler.config.schedule.on = on.to_string();
-            save_config(&scheduler.config, config_path)?;
-            Ok(serde_json::json!({ "ok": true }).to_string())
-        }
-        "restore" => {
-            let mode = parts.next().context("restore needs MODE [COLOR]")?;
-            let mode = match mode {
-                "captured" => RestoreMode::Captured,
-                "fixed" => RestoreMode::Fixed,
-                other => bail!("unknown restore mode {other}"),
-            };
-            let color = match parts.next() {
-                Some(hex) => parse_hex_color(hex)?,
-                None => parse_hex_color(&scheduler.lock().await.config.restore.color)?,
-            };
-            let mut scheduler = scheduler.lock().await;
-            scheduler.config.restore.mode = mode;
-            scheduler.config.restore.color = format_hex_color(color);
             save_config(&scheduler.config, config_path)?;
             Ok(serde_json::json!({ "ok": true }).to_string())
         }
@@ -282,8 +232,6 @@ struct Status {
     off: String,
     on: String,
     next: Option<String>,
-    mode: String,
-    color: String,
     captured: String,
     updated: Option<String>,
     action: Option<String>,
@@ -338,11 +286,6 @@ fn status(scheduler: &Scheduler, config_path: &Path) -> Status {
         off: config.schedule.off.clone(),
         on: config.schedule.on.clone(),
         next,
-        mode: match config.restore.mode {
-            RestoreMode::Captured => "captured".into(),
-            RestoreMode::Fixed => "fixed".into(),
-        },
-        color: config.restore.color.clone(),
         captured,
         updated: state.updated_at.clone(),
         action: state.last_action.clone(),
