@@ -48,11 +48,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate, N
     var dpiMinus: NSButton!
     var dpiPlus: NSButton!
     var dpiValue: NSTextField!
-    var smoothSwitch: NSButton!
-    var smoothMinus: NSButton!
-    var smoothPlus: NSButton!
-    var smoothSlider: NSSlider!
-    var smoothValue: NSTextField!
 
     var refreshTimer: Timer?
 

@@ -47,16 +47,6 @@ xcrun swiftc -typecheck gui/Sources/*.swift   # if you touched the window
 `cargo fmt` uses the edition pinned in `rustfmt.toml`. Formatting a single file
 with a bare `rustfmt file.rs` picks up the same config, so the two paths agree.
 
-One test is ignored by default because it drives a real event tap:
-
-```sh
-cargo test -- --ignored the_tap_swallows   # needs Accessibility
-```
-
-It posts a synthetic wheel notch, checks the tap swallowed it, and checks the
-notch came back out in several steps. CI cannot grant Accessibility, so it does
-not run there; run it by hand after touching `src/smooth.rs`.
-
 ## Pre-commit hook
 
 `scripts/hooks/pre-commit` runs the checks that are fast enough for every

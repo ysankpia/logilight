@@ -141,8 +141,8 @@ extension AppDelegate {
         dpiSlider.widthAnchor.constraint(equalToConstant: 208).isActive = true
         dpiValue = label("—")
         dpiValue.widthAnchor.constraint(equalToConstant: 56).isActive = true
-        // Same reason as the smoothing row: a drag cannot land on a round DPI,
-        // and the device only accepts multiples of its step.
+        // A drag cannot land on a round DPI, and the device only accepts
+        // multiples of its step.
         dpiMinus = button("−", action: #selector(dpiStepDown))
         dpiMinus.widthAnchor.constraint(equalToConstant: 30).isActive = true
         dpiPlus = button("+", action: #selector(dpiStepUp))
@@ -151,41 +151,6 @@ extension AppDelegate {
         dpiRow.orientation = .horizontal
         dpiRow.alignment = .centerY
         dpiRow.spacing = 8
-
-        // Smooth scrolling is off until it is switched on: it needs
-        // Accessibility and it changes how every scroll in the system feels.
-        smoothSwitch = NSButton(
-            checkboxWithTitle: "",
-            target: self,
-            action: #selector(smoothToggled)
-        )
-        smoothSlider = NSSlider(
-            value: 300,
-            minValue: 100,
-            maxValue: 700,
-            target: self,
-            action: #selector(smoothDurationChanged)
-        )
-        smoothSlider.isContinuous = false
-        smoothSlider.widthAnchor.constraint(equalToConstant: 150).isActive = true
-        // A slider alone is hard to land on an exact number, so it is flanked
-        // by a minus and a plus that step by a fixed amount.
-        smoothMinus = button("−", action: #selector(smoothStepDown))
-        smoothMinus.widthAnchor.constraint(equalToConstant: 30).isActive = true
-        smoothPlus = button("+", action: #selector(smoothStepUp))
-        smoothPlus.widthAnchor.constraint(equalToConstant: 30).isActive = true
-        smoothValue = label("300 ms")
-        smoothValue.widthAnchor.constraint(equalToConstant: 56).isActive = true
-        let smoothRow = NSStackView(views: [
-            smoothSwitch,
-            smoothMinus,
-            smoothSlider,
-            smoothPlus,
-            smoothValue,
-        ])
-        smoothRow.orientation = .horizontal
-        smoothRow.alignment = .centerY
-        smoothRow.spacing = 8
 
         let colorButton = button(text.applyNow, action: #selector(applyColor))
 
@@ -208,7 +173,6 @@ extension AppDelegate {
         let settings = NSStackView(views: [
             row(text.rowLightState, lightStateControl),
             row(text.rowDpi, dpiRow),
-            row(text.rowSmooth, smoothRow),
             row(text.rowOff, offFieldRow),
             row(text.rowOn, onFieldRow),
             row(text.rowMode, modePopup),
@@ -301,7 +265,6 @@ extension AppDelegate {
         // app then takes focus is up to the caller (see `showWindow`).
         window.orderFront(nil)
         loadDpi()
-        loadSmooth()
     }
 
     // Closing the window hides it instead of dismantling the app.

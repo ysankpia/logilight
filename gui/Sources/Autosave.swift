@@ -83,13 +83,6 @@ extension AppDelegate {
         NSWorkspace.shared.open(url)
     }
 
-    /// The pane that grants the event tap. Smoothing is the only feature that
-    /// needs Accessibility, so its row opens this one directly.
-    @objc func openAccessibility() {
-        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
-        NSWorkspace.shared.open(url)
-    }
-
     @objc func restartAgent() {
         let domain = "gui/\(getuid())/com.luhui.logilight"
         var status = launchctl(["kickstart", "-k", domain])
