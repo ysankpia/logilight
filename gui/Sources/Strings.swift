@@ -14,8 +14,6 @@ struct Strings {
     let scheduleLine: String
     let nextChange: String
     let noPermission: String
-    let captionSchedule: String
-    let captionAction: String
 
     let rowOff: String
     let rowOn: String
@@ -52,6 +50,8 @@ struct Strings {
     let statusOnLine: String
     let statusOffLine: String
     let statusNoDevice: String
+    let nowPrefix: String
+    let lastAction: String
     /// Detail line while a manual choice overrides the schedule.
     let manualHold: String
 
@@ -72,8 +72,6 @@ struct Strings {
         scheduleLine: "Schedule: off %@ → on %@",
         nextChange: "Next change: %@",
         noPermission: "Input Monitoring is NOT granted — the agent cannot reach the mouse.",
-        captionSchedule: "SCHEDULE",
-        captionAction: "LAST ACTION",
         rowOff: "Lights off at",
         rowOn: "Lights on at",
         rowLanguage: "Language",
@@ -99,6 +97,8 @@ struct Strings {
         statusOnLine: "Lights are on",
         statusOffLine: "Lights are off",
         statusNoDevice: "No mouse found",
+        nowPrefix: "Now",
+        lastAction: "Last · %1$@ · %2$@",
         manualHold: "set by hand — choose Schedule to follow the times again",
         menuOpenWindow: "Open LogiLight",
         menuOff: "Lights off now",
@@ -116,8 +116,6 @@ struct Strings {
         scheduleLine: "定时：%1$@ 关灯 → %2$@ 开灯",
         nextChange: "下次切换：%@",
         noPermission: "尚未授予“输入监控”权限，后台服务无法访问鼠标。",
-        captionSchedule: "定时",
-        captionAction: "上次操作",
         rowOff: "关灯时间",
         rowOn: "开灯时间",
         rowLanguage: "语言",
@@ -143,6 +141,8 @@ struct Strings {
         statusOnLine: "灯光已打开",
         statusOffLine: "灯光已关闭",
         statusNoDevice: "未找到鼠标",
+        nowPrefix: "现在",
+        lastAction: "上次操作 · %1$@ · %2$@",
         manualHold: "手动设置中，选「定时」才恢复自动",
         menuOpenWindow: "打开 LogiLight",
         menuOff: "立即关灯",

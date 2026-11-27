@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="utf-8" />
+    <title>LogiLight 灯光控制 — 设计原型</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      /* Direction: night desk — ink neutrals, one amber from the mouse LED.
+     This file is a design prototype; the shipping UI is AppKit. */
+
+      :root {
+        color-scheme: dark light;
+        --bg: #0b0d14;
+        --titlebar: #0e1118;
+        --card: #11141c;
+        --raised: #1a1e28;
+        --raised-2: #232733;
+        --hairline: rgba(238, 240, 245, 0.08);
+        --hairline-strong: rgba(238, 240, 245, 0.14);
+        --text: #eef0f5;
+        --text-2: #a3a9b8;
+        --text-3: #7a8296;
+        --accent: #f2b544;
+        --accent-soft: rgba(242, 181, 68, 0.16);
+        --dot-off: #4a5162;
+        --focus: rgba(242, 181, 68, 0.55);
+        --shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+      }
+
+      @media (prefers-color-scheme: light) {
+        :root {
+          --bg: #f5f7fa;
+          --titlebar: #eef1f6;
+          --card: #ffffff;
+          --raised: #eceff4;
+          --raised-2: #e3e8ef;
+          --hairline: rgba(17, 24, 39, 0.08);
+          --hairline-strong: rgba(17, 24, 39, 0.14);
+          --text: #111827;
+          --text-2: #4b5565;
+          --text-3: #6b7487;
+          --accent: #c98a12;
+          --accent-soft: rgba(201, 138, 18, 0.14);
+          --dot-off: #aeb6c4;
+          --focus: rgba(201, 138, 18, 0.45);
+          --shadow: 0 18px 48px rgba(17, 24, 39, 0.12);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+      }
+
+      body {
+        display: grid;
+        place-items: center;
+        padding: 48px 24px;
+        background: var(--bg);
+        font:
+          400 13px/18px -apple-system,
+          BlinkMacSystemFont,
+          "SF Pro Text",
+          "PingFang SC",
+          sans-serif;
+        color: var(--text);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* The window itself. Real size: 520 wide, content decides the height. */
+      .window {
+        width: 520px;
+        border-radius: 12px;
+        background: var(--bg);
+        box-shadow: var(--shadow);
+        border: 1px solid var(--hairline);
+        overflow: hidden;
+      }
+
+      .titlebar {
+        position: relative;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--titlebar);
+        border-bottom: 1px solid var(--hairline);
+      }
+
+      .titlebar .title {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-2);
+      }
+
+      .lights {
+        position: absolute;
+        left: 12px;
+        display: flex;
+        gap: 8px;
+      }
+
+      .lights i {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        display: block;
+      }
+
+      .lights i:nth-child(1) {
+        background: #ff5f57;
+      }
+      .lights i:nth-child(2) {
+        background: #febc2e;
+      }
+      .lights i:nth-child(3) {
+        background: #28c840;
+      }
+      @media (prefers-color-scheme: light) {
+        .lights i:nth-child(1) {
+          background: #ff6159;
+        }
+        .lights i:nth-child(2) {
+          background: #ffbd2e;
+        }
+        .lights i:nth-child(3) {
+          background: #29c73f;
+        }
+      }
+
+      .content {
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      /* ---------- status card: the one moment ---------- */
+
+      .card {
+        padding: 20px;
+        border-radius: 12px;
+        background: var(--card);
+        border: 1px solid var(--hairline);
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .state {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--dot-off);
+        flex: none;
+      }
+
+      .dot.on {
+        background: var(--accent);
+      }
+
+      .headline {
+        font-size: 15px;
+        line-height: 20px;
+        font-weight: 500;
+        color: var(--text);
+      }
+
+      .meta {
+        margin-left: 16px; /* dot (8) + gap (8) */
+        font-size: 13px;
+        line-height: 18px;
+        color: var(--text-2);
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* Night bar: a 24 hour track. Amber is light-on (07:00 to 22:00),
+     the ends are the off window. It wraps midnight, which is the point. */
+      .night {
+        margin: 16px 0 0 16px;
+      }
+
+      .night-track {
+        position: relative;
+        height: 4px;
+        border-radius: 2px;
+        background: var(--raised-2);
+        overflow: visible;
+      }
+
+      .night-track .on {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 29.1667%; /* 07:00 */
+        width: 62.5%; /* 07:00 → 22:00 */
+        border-radius: 2px;
+        background: var(--accent);
+      }
+
+      .night-track .now {
+        position: absolute;
+        top: -3px;
+        bottom: -3px;
+        width: 1px;
+        background: var(--text-2);
+      }
+
+      .night-labels {
+        position: relative;
+        height: 16px;
+        margin-top: 8px;
+        font-size: 11px;
+        line-height: 16px;
+        color: var(--text-3);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .night-labels span {
+        position: absolute;
+        transform: translateX(-50%);
+      }
+      .night-labels .at-7 {
+        left: 29.1667%;
+      }
+      .night-labels .at-22 {
+        left: 91.6667%;
+      }
+
+      .last {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        margin: 12px 0 0 16px;
+        font-size: 12px;
+        line-height: 16px;
+        color: var(--text-3);
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* ---------- settings rows ---------- */
+
+      .settings {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .group {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .row.sep {
+        margin-top: 8px;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: 96px 1fr;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .row > .label {
+        text-align: right;
+        font-size: 13px;
+        color: var(--text-2);
+      }
+
+      /* Segmented control: a track with one raised, hairline-selected segment. */
+      .segmented {
+        display: inline-grid;
+        grid-auto-flow: column;
+        grid-auto-columns: 1fr;
+        width: 176px;
+        padding: 2px;
+        border-radius: 8px;
+        background: var(--raised);
+      }
+
+      .segmented button {
+        appearance: none;
+        border: 1px solid transparent;
+        background: transparent;
+        color: var(--text-2);
+        font: 400 12px/16px inherit;
+        height: 24px;
+        border-radius: 6px;
+        cursor: default;
+      }
+
+      .segmented button[aria-pressed="true"] {
+        background: var(--raised-2);
+        border-color: var(--hairline-strong);
+        color: var(--text);
+      }
+
+      /* Time field: one value, one stepper column. */
+      .time {
+        display: inline-flex;
+        align-items: stretch;
+        gap: 8px;
+      }
+
+      .time .value {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 72px;
+        height: 28px;
+        border-radius: 6px;
+        background: var(--raised);
+        border: 1px solid var(--hairline);
+        font-size: 13px;
+        font-variant-numeric: tabular-nums;
+        color: var(--text);
+      }
+
+      .stepper {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        width: 16px;
+      }
+
+      .stepper button {
+        appearance: none;
+        border: 0;
+        padding: 0;
+        height: 13px;
+        border-radius: 3px;
+        background: var(--raised);
+        color: var(--text-3);
+        font-size: 8px;
+        line-height: 13px;
+        cursor: default;
+      }
+
+      .select {
+        display: inline-flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 120px;
+        height: 28px;
+        padding: 0 8px;
+        border-radius: 6px;
+        background: var(--raised);
+        border: 1px solid var(--hairline);
+        color: var(--text);
+        font-size: 13px;
+      }
+
+      .select .chev {
+        color: var(--text-3);
+        font-size: 10px;
+      }
+
+      /* ---------- footer ---------- */
+
+      .footer {
+        display: flex;
+        gap: 8px;
+        padding-top: 16px;
+        border-top: 1px solid var(--hairline);
+      }
+
+      .btn {
+        appearance: none;
+        height: 28px;
+        padding: 0 12px;
+        border-radius: 6px;
+        border: 1px solid var(--hairline);
+        background: var(--raised);
+        color: var(--text);
+        font: 400 12px/16px inherit;
+        cursor: default;
+      }
+
+      .btn.quiet {
+        background: transparent;
+        color: var(--text-2);
+      }
+
+      /* The permission warning, when it shows, is one amber line, never a box. */
+      .warning {
+        display: none;
+        margin-left: 16px;
+        font-size: 12px;
+        line-height: 16px;
+        color: var(--accent);
+      }
+
+      .window.needs-permission .warning {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="window" id="window">
+      <div class="titlebar">
+        <div class="lights"><i></i><i></i><i></i></div>
+        <div class="title">LogiLight 灯光控制</div>
+      </div>
+
+      <div class="content">
+        <section class="card">
+          <div class="state">
+            <span class="dot" id="dot"></span>
+            <span class="headline" id="headline">灯光已关闭</span>
+          </div>
+          <div class="meta" id="meta">
+            G102 LIGHTSYNC · 下次切换 11月28日 周六 07:00
+          </div>
+          <p class="warning">
+            尚未授予「输入监控」权限，后台服务无法访问鼠标。
+          </p>
+
+          <div class="night" aria-hidden="true">
+            <div class="night-track">
+              <span class="on" id="nightOn"></span>
+              <span class="now" id="nowMark" style="left: 98.9%"></span>
+            </div>
+            <div class="night-labels">
+              <span class="at-7" id="labelOn">07:00</span>
+              <span class="at-22" id="labelOff">22:00</span>
+            </div>
+          </div>
+
+          <div class="last">
+            <span id="last">上次操作 · 定时 · 23:57</span>
+            <span id="nowText">现在 00:15</span>
+          </div>
+        </section>
+
+        <section class="settings">
+          <div class="row">
+            <span class="label">灯光状态</span>
+            <div class="segmented" role="group">
+              <button aria-pressed="true">定时</button>
+              <button aria-pressed="false">打开</button>
+              <button aria-pressed="false">关闭</button>
+            </div>
+          </div>
+
+          <div class="group">
+            <div class="row">
+              <span class="label">关灯时间</span>
+              <div class="time">
+                <span class="value">22:00</span>
+                <span class="stepper"
+                  ><button>▲</button><button>▼</button></span
+                >
+              </div>
+            </div>
+            <div class="row">
+              <span class="label">开灯时间</span>
+              <div class="time">
+                <span class="value">07:00</span>
+                <span class="stepper"
+                  ><button>▲</button><button>▼</button></span
+                >
+              </div>
+            </div>
+          </div>
+
+          <div class="row sep">
+            <span class="label">语言</span>
+            <span class="select">跟随系统 <span class="chev">▼</span></span>
+          </div>
+        </section>
+
+        <footer class="footer">
+          <button class="btn">系统权限设置…</button>
+          <button class="btn quiet">重启服务</button>
+        </footer>
+      </div>
+    </div>
+
+    <script>
+      // Two states to look at: off (default) and on. Flip with ?on
+      const on = new URLSearchParams(location.search).has("on");
+      if (on) {
+        document.getElementById("dot").classList.add("on");
+        document.getElementById("headline").textContent = "灯光已打开";
+        document.getElementById("meta").textContent =
+          "G102 LIGHTSYNC · 下次切换 11月27日 周五 22:00";
+        document.getElementById("last").textContent =
+          "上次操作 · 手动打开 · 00:12";
+      }
+    </script>
+  </body>
+</html>

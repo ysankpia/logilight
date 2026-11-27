@@ -30,7 +30,6 @@ extension AppDelegate {
             present(error)
             return
         }
-        flashSaved()
         busy = false
         refresh()
     }
@@ -44,15 +43,6 @@ extension AppDelegate {
             guard let self else { return }
             self.editingTimes = false
             self.refresh()
-        }
-    }
-
-    func flashSaved() {
-        savedLabel.stringValue = strings.autoSaved
-        savedLabel.isHidden = false
-        savedTimer?.invalidate()
-        savedTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: false) { [weak self] _ in
-            self?.savedLabel.isHidden = true
         }
     }
 

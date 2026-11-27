@@ -20,37 +20,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate, N
 
     var permissionLabel: NSTextField!
 
-    var scheduleValue: NSTextField!
+    /// The amber dot that carries the state.
+    var statusDot: NSView!
 
-    var actionValue: NSTextField!
+    /// The 24 hour track under the headline.
+    var nightBar: NightBarView!
+
+    var lastLabel: NSTextField!
+
+    var nowLabel: NSTextField!
 
     var offPicker: NSDatePicker!
 
     var onPicker: NSDatePicker!
 
-    /// The picker plus its arrow columns, as one laid-out view.
-    var offFieldRow: NSView!
-
-    var onFieldRow: NSView!
-
     var languagePopup: NSPopUpButton!
 
     var lightStateControl: NSSegmentedControl!
-
-    var savedLabel: NSTextField!
 
     var refreshTimer: Timer?
 
     var busy = false
 
+    /// Pause that lets a stepper click settle before the pickers are released.
     var savedTimer: Timer?
 
     /// Set while the time pickers should not be overwritten from the agent:
     /// the user is mid-edit, or a save is still in flight.
     var editingTimes = false
-
-    /// Which picker and segment each stepper drives, keyed by identity.
-    var steppers: [ObjectIdentifier: (NSDatePicker, Int)] = [:]
 
     var strings: Strings {
         Strings.resolve()
