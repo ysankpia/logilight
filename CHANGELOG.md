@@ -14,6 +14,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   with the same range.
 - `−` and `+` beside the DPI slider, stepping by the device's DPI step (50),
   so it lands on a round number without dragging.
+- `logilight release` returns LED control to the device's firmware
+  (`0x8071` software control), so a mouse that was painted with a solid colour
+  shows its own effect again without a power cycle.
 - Menu bar item with the light state, _Off / On / Schedule_, _Open LogiLight_,
   and _Quit_. The icon dims while the lights are off and its tooltip names the
   current state.

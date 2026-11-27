@@ -9,6 +9,7 @@
 use anyhow::{Context, Result, anyhow};
 use hidpp::device::Device;
 use hidpp::feature::color_led_effects::ColorLedEffectsFeature;
+use hidpp::feature::rgb_effects::{RgbEffectsFeature, SwControlFlags};
 use openlogi_core::device::{DeviceInventory, DeviceKind};
 use openlogi_hid::{DeviceRoute, dump_features};
 use std::sync::Arc;
@@ -24,6 +25,10 @@ const LIGHTING_FEATURES: [u16; 4] = [0x8070, 0x8071, 0x8081, 0x8080];
 
 /// `ColorLedEffects` feature id, read back for the live colour.
 const COLOR_LED_EFFECTS: u16 = 0x8070;
+
+/// `RgbEffects` feature id: the engine a device without `0x8070` writes
+/// through, and the one whose software-control flag has to be handed back.
+const RGB_EFFECTS: u16 = 0x8071;
 
 /// Attempts per colour write. An idle device drops the first HID++ request
 /// after a wake, and a channel the pool replaced mid-flight fails the same
@@ -321,6 +326,49 @@ pub async fn read_color(route: &DeviceRoute) -> Result<Option<Rgb>> {
         }
     }
     Ok(last)
+}
+
+/// Hand LED control back to the firmware so the device shows its own effect.
+///
+/// A colour write takes software control of the LEDs and leaves it held; the
+/// firmware keeps replaying nothing while that flag is set. A device this tool
+/// never manages — one whose colour cannot be read — would otherwise stay on
+/// the last static colour written by an older build. Returns whether control
+/// was actually held.
+pub async fn release_lighting(route: &DeviceRoute) -> Result<bool> {
+    let pool = openlogi_hid::channel_pool();
+    let channel = pool
+        .open(route)
+        .await
+        .map_err(|error| anyhow!("open {}: {error}", route))?
+        .ok_or_else(|| anyhow!("device not connected: {route}"))?;
+    let mut device = Device::new(Arc::clone(&channel), route.device_index())
+        .await
+        .map_err(|error| anyhow!("initialize device {route}: {error}"))?;
+    let Some(info) = device
+        .root()
+        .get_feature(RGB_EFFECTS)
+        .await
+        .map_err(|error| anyhow!("resolve 0x8071 on {route}: {error}"))?
+    else {
+        return Ok(false);
+    };
+    let feature = device.add_feature::<RgbEffectsFeature>(info.index);
+    let state = feature
+        .get_sw_control()
+        .await
+        .map_err(|error| anyhow!("read 0x8071 control on {route}: {error}"))?;
+    if !state.control.contains(SwControlFlags::ALL_CLUSTERS) {
+        return Ok(false);
+    }
+    feature
+        .set_sw_control(
+            state.control.difference(SwControlFlags::ALL_CLUSTERS),
+            state.events,
+        )
+        .await
+        .map_err(|error| anyhow!("release 0x8071 control on {route}: {error}"))?;
+    Ok(true)
 }
 
 /// Record applied colours as the ones to restore after the next lights-out.

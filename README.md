@@ -22,6 +22,8 @@ Tested end-to-end on a wired **G502 HERO** (`046d:c08b`), which exposes HID++
   exact colour in the morning (`restore.mode = "captured"`). A device that
   cannot report its colour — the G102 has no `0x8070` read-back — is left
   alone, so its own lighting effect survives instead of being painted over.
+- `logilight release` hands LED control back to the device's firmware, which is
+  what a device does for itself after a colour write claimed it.
 - Runs as a per-user `launchd` agent, starts at login, survives sleep/wake and
   device reconnects.
 - Re-applies the night colour if the mouse forgets it (the write is volatile
@@ -151,6 +153,7 @@ logilight color 3366ff        # apply a solid colour now
 logilight auto                # drop a manual choice, follow the schedule again
 logilight dpi                 # read the pointer's DPI and supported range
 logilight dpi 1600            # write a DPI the device accepts
+logilight release             # give the lights back to the device's own effect
 logilight doctor              # permission + device inventory
 logilight daemon --once       # evaluate the schedule once and exit
 ```

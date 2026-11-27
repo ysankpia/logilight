@@ -53,6 +53,8 @@ enum Command {
         /// Target DPI; omitted means read only.
         value: Option<u16>,
     },
+    /// Hand the lights back to the device's own effect.
+    Release,
     /// Hand lighting back to the schedule and apply the phase it wants now.
     Auto,
     /// Show the schedule, devices, and last applied state.
@@ -157,6 +159,28 @@ fn main() -> Result<()> {
                     "dpi: {} (range {}–{}, step {}, {} values)",
                     report.current, report.min, report.max, report.step, report.values
                 );
+                Ok(())
+            })
+        }
+        Command::Release => {
+            let runtime = util::runtime()?;
+            runtime.block_on(async {
+                let devices = device::lighting_devices(&config, false).await?;
+                if devices.is_empty() {
+                    println!("no lighting devices found");
+                }
+                let mut released = 0;
+                for found in &devices {
+                    match device::release_lighting(&found.route).await {
+                        Ok(true) => {
+                            released += 1;
+                            println!("{}: lights back to the device", found.name);
+                        }
+                        Ok(false) => println!("{}: already the device's own", found.name),
+                        Err(error) => eprintln!("warning: {}: {error:#}", found.name),
+                    }
+                }
+                println!("released {released} device(s)");
                 Ok(())
             })
         }
