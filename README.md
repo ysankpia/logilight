@@ -19,7 +19,9 @@ Tested end-to-end on a wired **G502 HERO** (`046d:c08b`), which exposes HID++
 - Sets a solid colour through HID++ `0x8070`, with the `0x8071` / `0x808x`
   fallbacks OpenLogi uses for other devices.
 - Captures the colour that was live when the lights went out and restores that
-  exact colour in the morning (`restore.mode = "captured"`).
+  exact colour in the morning (`restore.mode = "captured"`). A device that
+  cannot report its colour — the G102 has no `0x8070` read-back — is left
+  alone, so its own lighting effect survives instead of being painted over.
 - Runs as a per-user `launchd` agent, starts at login, survives sleep/wake and
   device reconnects.
 - Re-applies the night colour if the mouse forgets it (the write is volatile

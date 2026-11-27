@@ -22,6 +22,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- In captured mode a device whose live colour cannot be read is left untouched:
+  without the "before" colour there is nothing to restore, and writing the
+  fallback over an onboard effect lost it (the G102 LIGHTSYNC reports no
+  `0x8070`, so it kept turning white every morning).
+
 - A manual _On_ or _Off_ now holds until another state is chosen, instead of
   lapsing at the next scheduled boundary. Turning the lights off by hand keeps
   them off through the night and the next morning until _Schedule_ (or

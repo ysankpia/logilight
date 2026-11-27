@@ -216,20 +216,31 @@ fn finish_apply(applied: Vec<AppliedDevice>, failures: Vec<String>) -> Result<Ve
 }
 
 /// Turn lighting off, capturing each device's live colour first.
+///
+/// Captured mode only drives devices that can report their current colour:
+/// without the "before" colour there is nothing to restore in the morning, and
+/// writing black over an onboard effect would lose it. A device that cannot be
+/// read (no `0x8070`, as on the G102) keeps whatever effect it runs.
 pub async fn apply_off(config: &Config, state: &mut State) -> Result<Vec<AppliedDevice>> {
     let devices = lighting_devices(config, false).await?;
-    for device in &devices {
-        match read_color(&device.route).await {
-            // A colour that is already black means there is nothing worth
-            // restoring; recording it would leave the mouse dark at dawn.
-            Ok(Some(color)) if color != OFF_COLOR => {
-                state.captured.insert(device.key(), format_hex_color(color));
+    let mut wanted = Vec::new();
+    for device in devices {
+        match config.restore.mode {
+            RestoreMode::Fixed => wanted.push(device),
+            RestoreMode::Captured => {
+                if let Ok(Some(color)) = read_color(&device.route).await {
+                    // A colour that is already black means there is nothing
+                    // worth restoring; recording it would leave the mouse dark
+                    // at dawn.
+                    if color != OFF_COLOR {
+                        state.captured.insert(device.key(), format_hex_color(color));
+                    }
+                    wanted.push(device);
+                }
             }
-            Ok(Some(_)) => {}
-            Ok(None) | Err(_) => {}
         }
     }
-    apply_rgb_to(&devices, OFF_COLOR).await
+    apply_rgb_to(&wanted, OFF_COLOR).await
 }
 
 /// The colour to write when the off window ends.
@@ -242,11 +253,19 @@ pub async fn apply_on_color(config: &Config, state: &mut State) -> Result<Vec<Ap
     for device in &devices {
         let color = match config.restore.mode {
             RestoreMode::Fixed => fixed,
-            RestoreMode::Captured => state
-                .captured
-                .get(&device.key())
-                .and_then(|hex| crate::util::parse_hex_color(hex).ok())
-                .unwrap_or(fallback),
+            RestoreMode::Captured => {
+                // The same rule as lights-out: a device that cannot report its
+                // colour keeps its own effect instead of being painted with the
+                // fallback every morning.
+                if !matches!(read_color(&device.route).await, Ok(Some(_))) {
+                    continue;
+                }
+                state
+                    .captured
+                    .get(&device.key())
+                    .and_then(|hex| crate::util::parse_hex_color(hex).ok())
+                    .unwrap_or(fallback)
+            }
         };
         match write_color(&device.route, color).await {
             Ok(()) => applied.push(AppliedDevice {
