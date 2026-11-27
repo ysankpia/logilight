@@ -24,8 +24,6 @@ struct Strings {
     let rowColor: String
     let rowLanguage: String
     let rowDpi: String
-    let rowSmooth: String
-    let smoothNeedsAccessibility: String
     let actionFailed: String
 
     let modeCaptured: String
@@ -89,8 +87,6 @@ struct Strings {
         rowColor: "Fixed colour",
         rowLanguage: "Language",
         rowDpi: "DPI",
-        rowSmooth: "Smooth scrolling",
-        smoothNeedsAccessibility: "Smooth scrolling needs Accessibility.\n\nThe settings page opens next: add\n~/Library/Application Support/logilight/LogiLight.app\nto the list, switch it on, press Restart agent here, then turn smoothing on again.",
         actionFailed: "Action failed",
         modeCaptured: "Restore the colour it had",
         modeFixed: "Always use a fixed colour",
@@ -141,8 +137,6 @@ struct Strings {
         rowColor: "固定颜色",
         rowLanguage: "语言",
         rowDpi: "DPI",
-        rowSmooth: "平滑滚动",
-        smoothNeedsAccessibility: "平滑滚动需要「辅助功能」权限。\n\n点「好」之后会打开设置页：把\n~/Library/Application Support/logilight/LogiLight.app\n拖进列表（或点左下角的 + 选择它），打开开关，然后回到这里点「重启服务」，再把平滑滚动打开。",
         actionFailed: "操作失败",
         modeCaptured: "恢复关灯前的颜色",
         modeFixed: "始终使用固定颜色",

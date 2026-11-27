@@ -12,13 +12,12 @@ mod device;
 mod dpi;
 mod launchd;
 mod schedule;
-mod smooth;
 mod state;
 mod util;
 
 use std::path::PathBuf;
 
-use anyhow::{Context, Result, bail};
+use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 use crate::config::Config;
@@ -53,12 +52,6 @@ enum Command {
     Dpi {
         /// Target DPI; omitted means read only.
         value: Option<u16>,
-    },
-    /// Turn smooth wheel scrolling on or off, or report its state.
-    Smooth {
-        /// `on`, `off`, `status`, or `duration <ms>`.
-        #[arg(num_args = 0..)]
-        args: Vec<String>,
     },
     /// Hand lighting back to the schedule and apply the phase it wants now.
     Auto,
@@ -167,22 +160,6 @@ fn main() -> Result<()> {
                 Ok(())
             })
         }
-        Command::Smooth { args } => {
-            let command = match args.first().map(String::as_str) {
-                Some("on") => "smooth on".to_string(),
-                Some("off") => "smooth off".to_string(),
-                None | Some("status") => "smooth".to_string(),
-                Some("duration") => {
-                    let value = args.get(1).context("smooth duration needs milliseconds")?;
-                    format!("smooth duration {value}")
-                }
-                Some(other) => {
-                    bail!("smooth takes on, off, status, or duration <ms> (got {other})")
-                }
-            };
-            println!("{}", control::request(&command)?);
-            Ok(())
-        }
         Command::Auto => {
             let runtime = util::runtime()?;
             runtime.block_on(async {
@@ -230,14 +207,6 @@ async fn doctor(config: &Config, config_path: &std::path::Path) -> Result<()> {
     println!(
         "input monitoring: {}",
         if granted { "granted" } else { "NOT granted" }
-    );
-    println!(
-        "accessibility:    {} (only smooth scrolling needs it)",
-        if smooth::has_accessibility() {
-            "granted"
-        } else {
-            "NOT granted"
-        }
     );
     if !granted {
         println!(

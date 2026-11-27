@@ -110,25 +110,6 @@ impl Default for Restore {
     }
 }
 
-/// Smooth wheel scrolling, off by default.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct Scroll {
-    /// Whether the daemon replays wheel gestures in small steps.
-    pub enabled: bool,
-    /// How long one notch takes to travel, in milliseconds.
-    pub duration_ms: u64,
-}
-
-impl Default for Scroll {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            duration_ms: 300,
-        }
-    }
-}
-
 /// How the "on" time decides which colour to write.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -149,8 +130,6 @@ pub struct Config {
     pub schedule: Schedule,
     /// What to restore when the window ends.
     pub restore: Restore,
-    /// Smooth wheel scrolling.
-    pub scroll: Scroll,
     /// Write a line per transition to the log.
     pub verbose: bool,
 }
@@ -161,7 +140,6 @@ impl Default for Config {
             devices: DeviceFilter::default(),
             schedule: Schedule::default(),
             restore: Restore::default(),
-            scroll: Scroll::default(),
             verbose: true,
         }
     }
@@ -236,13 +214,6 @@ impl Config {
         out.push_str(&format!(
             "# Used when nothing was captured.\nfallback = \"{}\"\n",
             self.restore.fallback
-        ));
-        out.push_str("\n[scroll]\n");
-        out.push_str("# Replay wheel gestures in small steps. Needs Accessibility.\n");
-        out.push_str(&format!("enabled = {}\n", self.scroll.enabled));
-        out.push_str(&format!(
-            "# How long one notch takes to travel, in milliseconds.\nduration_ms = {}\n",
-            self.scroll.duration_ms
         ));
         Ok(out)
     }
